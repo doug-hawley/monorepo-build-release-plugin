@@ -16,6 +16,8 @@ A Gradle plugin for multi-module projects that uses git history to detect which 
 
 ### Apply the plugin
 
+Requires Gradle 7.0+, Java 17+, and Git in your PATH.
+
 ```kotlin
 plugins {
     id("io.github.doug-hawley.monorepo-build-release-plugin") version "0.3.2" // x-release-please-version
@@ -280,12 +282,6 @@ Check your `excludePatterns` configuration - you may be inadvertently excluding 
 ### Root project always shows as changed
 
 This is expected if files in the root directory (outside of subproject directories) have changed. To prevent this, ensure all code is within subproject directories.
-
-## Requirements
-
-- Gradle 7.0 or higher
-- Git installed and available in PATH
-- Java 17 or higher
 
 ## Support & Contributions
 
