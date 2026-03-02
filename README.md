@@ -1,26 +1,16 @@
-# Monorepo Build Plugin
+# Monorepo Build Release Plugin
 
 [![CI](https://github.com/doug-hawley/monorepo-build-release-plugin/actions/workflows/ci.yml/badge.svg)](https://github.com/doug-hawley/monorepo-build-release-plugin/actions/workflows/ci.yml)
 
-A Gradle plugin designed to optimize build times in large multi-module Gradle projects and monorepos by detecting which projects have changed based on git history.
+A Gradle plugin for multi-module projects that uses git history to detect which projects have changed, enabling selective per-project builds and versioned releases.
 
-## Overview
+## Key Features
 
-In large multi-module builds, running the entire build pipeline for every code change is inefficient and time-consuming. This plugin solves that problem by:
-
-1. **Detecting changed files** - Compares the current code state against a base branch to identify modified files
-2. **Identifying affected projects** - Determines which Gradle projects contain the changed files
-3. **Tracking dependencies** - Reports projects that are affected due to changes in their dependencies
-4. **Enabling selective builds** - Provides data to run builds only for projects with changes
-
-This dramatically reduces build times in CI/CD pipelines by avoiding unnecessary compilation, testing, and deployment of unchanged modules.
-
-## Use Cases
-
-- **Monorepo optimization** - Build only affected services/modules in a large monorepo
-- **CI/CD efficiency** - Skip tests and builds for unchanged projects
-- **Faster feedback loops** - Reduce PR build times by focusing on impacted code
-- **Resource optimization** - Save compute resources by avoiding redundant builds
+- **Gradle-native dependency tracking** — changed project detection reads your existing Gradle project dependencies directly; no separate dependency map to define or maintain
+- **Two detection modes** — branch-mode for local development (compare against a base branch), ref-mode for CI pipelines (compare against a commit SHA or ref)
+- **Transitive impact analysis** — projects that depend on a changed project are automatically included
+- **Selective builds** — run builds and tests only for affected projects, reducing CI time in large monorepos
+- **Per-project versioning** — each subproject gets its own semantic version tag; only changed projects are released
 
 ## Usage
 
@@ -32,7 +22,7 @@ plugins {
 }
 ```
 
-### Configure the plugin
+### Change Detection
 
 ```kotlin
 monorepoBuild {
@@ -57,14 +47,6 @@ monorepoProjectConfig {
     )
 }
 ```
-
-### Tasks
-
-The plugin provides two sets of tasks suited to different workflows:
-
-**Branch-mode tasks** compare against a base branch and are designed for developers working on a feature branch. Before opening a pull request, you can run `buildChangedProjectsFromBranch` to build only the projects you have changed, getting a fast confidence check without rebuilding the entire repository.
-
-**Ref-mode tasks** compare against a specific commit ref and are designed for CI/CD pipelines. When a pipeline wants to build only what changed since the last commit on main, or since a known-good previous commit, ref-mode tasks provide that targeted detection. By default they compare against `HEAD~1` (the previous commit), which works out of the box for pipelines that run on every commit. For pipelines that track a last-known-good SHA, pass that SHA via `-PmonorepoBuild.commitRef=<sha>` to override the default.
 
 #### `printChangedProjectsFromBranch`
 
@@ -145,7 +127,7 @@ tasks.named<io.github.doughawley.monorepo.build.task.WriteChangedProjectsFromRef
 }
 ```
 
-### Access changed projects in other tasks
+#### Access changed projects in other tasks
 
 The plugin computes results during the configuration phase, so any task can access them directly from the `monorepoBuild` extension — no `dependsOn` needed:
 
@@ -165,29 +147,106 @@ tasks.register("customTask") {
 }
 ```
 
-## Configuration Options
+### Releases
+
+Each subproject manages its own semantic version using git tags of the form `{globalTagPrefix}/{projectPrefix}/v{version}` (e.g. `release/api/v1.2.0`). Release is opt-in per subproject.
+
+#### Opting in a subproject
+
+In each subproject's `build.gradle.kts`:
+
+```kotlin
+monorepoReleaseConfig {
+    enabled = true
+}
+```
+
+The tag prefix is derived automatically from the Gradle path (`:api:core` → `api-core`). Override it if needed:
+
+```kotlin
+monorepoReleaseConfig {
+    enabled = true
+    tagPrefix = "my-api"
+}
+```
+
+#### Global configuration
+
+```kotlin
+monorepoRelease {
+    globalTagPrefix = "release"       // prefix for all tags and branches; default "release"
+    primaryBranchScope = "minor"      // version bump on the primary branch; "minor" or "major"; default "minor"
+    releaseBranchPatterns = listOf(   // regex patterns for allowed release branches
+        "^main$",
+        "^release/.*"
+    )
+}
+```
+
+#### `releaseChangedProjects`
+
+Builds all opted-in projects that changed since the configured commit ref, then releases each one:
+
+```bash
+./gradlew releaseChangedProjects -PmonorepoBuild.commitRef=abc123
+```
+
+#### `:subproject:release`
+
+Releases a single subproject manually, regardless of whether it changed:
+
+```bash
+./gradlew :api:release
+```
+
+Override the version bump scope (primary branch only):
+
+```bash
+./gradlew :api:release -Prelease.scope=major
+```
+
+#### Versioning rules
+
+- First release of a project starts at `0.1.0`
+- Releases from the primary branch bump using `primaryBranchScope` (default `minor`)
+- Releases from a release branch (`release/api/v1.2.x`) always apply a `patch` bump
+- The subproject must be built before releasing — `release` requires `build` to have run
+
+## Configuration Reference
+
+### `monorepoBuild`
 
 | Property | Type | Default | Description |
 |----------|------|---------|-------------|
 | `baseBranch` | String | `"main"` | The git branch to compare against (branch-mode tasks) |
 | `commitRef` | String | `"HEAD~1"` | Commit SHA, tag, or ref expression to compare against HEAD (ref-mode tasks). Can also be supplied at runtime via `-PmonorepoBuild.commitRef=<sha>`, which takes precedence over the DSL value |
 | `includeUntracked` | Boolean | `true` | Whether to include untracked files in detection (branch-mode only) |
-| `excludePatterns` | List<String> | `[]` | Regex patterns for files to exclude globally |
+| `excludePatterns` | List\<String\> | `[]` | Regex patterns for files to exclude globally across all projects |
 
-### Per-project excludes
+### `monorepoProjectConfig`
 
-Individual subprojects can declare their own exclude patterns using the `monorepoProjectConfig` extension. This is useful when a team wants to ignore generated files or other noise that is specific to their module without cluttering the root configuration.
+Applied per subproject. Patterns are matched against paths **relative to the subproject directory** and applied **after** global `excludePatterns`.
 
-```kotlin
-// In :api/build.gradle.kts
-monorepoProjectConfig {
-    excludePatterns = listOf("generated/.*", ".*\\.json")
-}
-```
+| Property | Type | Default | Description |
+|----------|------|---------|-------------|
+| `excludePatterns` | List\<String\> | `[]` | Regex patterns for files to exclude in this subproject |
 
-- Patterns are Java regex strings matched against file paths **relative to the subproject directory** (e.g., `generated/Code.kt`, not `api/generated/Code.kt`).
-- Per-project patterns are applied **after** global `excludePatterns`, so the two stages are independent and complementary.
-- The extension is automatically registered on all subprojects by the plugin — subprojects do not need to apply the plugin themselves.
+### `monorepoRelease`
+
+| Property | Type | Default | Description |
+|----------|------|---------|-------------|
+| `globalTagPrefix` | String | `"release"` | Prefix used in all tag and release branch names |
+| `primaryBranchScope` | String | `"minor"` | Version bump scope when releasing from the primary branch; `"minor"` or `"major"` |
+| `releaseBranchPatterns` | List\<String\> | `["^main$", "^release/.*"]` | Regex patterns for branches from which releases are permitted |
+
+### `monorepoReleaseConfig`
+
+Applied per subproject to opt in to release management.
+
+| Property | Type | Default | Description |
+|----------|------|---------|-------------|
+| `enabled` | Boolean | `false` | Whether this subproject participates in releases |
+| `tagPrefix` | String? | `null` | Override the auto-derived tag prefix (default derives from Gradle path: `:api:core` → `api-core`) |
 
 ## Troubleshooting
 
