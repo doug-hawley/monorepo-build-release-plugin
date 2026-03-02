@@ -88,7 +88,7 @@ class GitChangedFilesDetector(
             logger.warn(
                 "Could not resolve base branch '$baseBranch' as a remote (origin/$baseBranch) " +
                 "or local ref — skipping branch comparison. " +
-                "Check that 'baseBranch' is set correctly in your monorepoBuild configuration."
+                "Check that 'baseBranch' is set correctly in your monorepo { build { } } configuration."
             )
             return emptySet()
         }

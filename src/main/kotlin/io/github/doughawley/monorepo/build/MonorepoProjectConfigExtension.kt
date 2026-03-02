@@ -6,8 +6,10 @@ package io.github.doughawley.monorepo.build
  *
  * Usage in a subproject's build.gradle.kts:
  * ```
- * monorepoProjectConfig {
- *     excludePatterns = listOf("generated/.*", ".*\\.json")
+ * monorepoProject {
+ *     build {
+ *         excludePatterns = listOf("generated/.*", ".*\\.json")
+ *     }
  * }
  * ```
  */

@@ -43,7 +43,7 @@ open class GitRepository(
         if (!result.success) {
             throw IllegalArgumentException(
                 "Commit ref '$commitRef' does not exist in this repository. " +
-                "Check the value passed to commitRef / -PmonorepoBuild.commitRef."
+                "Check the value passed to commitRef / -Pmonorepo.commitRef."
             )
         }
         return result.output

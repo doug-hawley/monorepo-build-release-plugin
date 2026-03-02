@@ -1,6 +1,6 @@
 package io.github.doughawley.monorepo.build.task
 
-import io.github.doughawley.monorepo.build.MonorepoBuildExtension
+import io.github.doughawley.monorepo.MonorepoExtension
 import org.gradle.api.DefaultTask
 import org.gradle.api.GradleException
 import org.gradle.api.file.RegularFileProperty
@@ -27,14 +27,14 @@ abstract class WriteChangedProjectsFromRefTask : DefaultTask() {
      * The file to write changed project paths to.
      * Defaults to build/monorepo/changed-projects.txt.
      * Override via tasks.named<WriteChangedProjectsFromRefTask>(...) { outputFile.set(...) }
-     * or at runtime with -PmonorepoBuild.outputFile=<path>.
+     * or at runtime with -Pmonorepo.outputFile=<path>.
      */
     @get:OutputFile
     abstract val outputFile: RegularFileProperty
 
     @TaskAction
     fun write() {
-        val extension = project.rootProject.extensions.getByType(MonorepoBuildExtension::class.java)
+        val extension = project.rootProject.extensions.getByType(MonorepoExtension::class.java).build
 
         if (!extension.metadataComputed) {
             throw GradleException(

@@ -3,6 +3,7 @@ package io.github.doughawley.monorepo.build.task
 import io.github.doughawley.monorepo.build.ChangedProjectsPrinter
 import io.github.doughawley.monorepo.build.MonorepoBuildExtension
 import io.github.doughawley.monorepo.MonorepoBuildReleasePlugin
+import io.github.doughawley.monorepo.MonorepoExtension
 import org.gradle.api.DefaultTask
 import org.gradle.api.tasks.TaskAction
 
@@ -18,7 +19,7 @@ abstract class PrintChangedProjectsTask : DefaultTask() {
 
     @TaskAction
     fun detectChanges() {
-        val extension = project.rootProject.extensions.getByType(MonorepoBuildExtension::class.java)
+        val extension = project.rootProject.extensions.getByType(MonorepoExtension::class.java).build
 
         // If metadata wasn't computed in configuration phase (e.g., in unit tests),
         // compute it now as a fallback

@@ -28,7 +28,7 @@ class WriteChangedProjectsFromRefFunctionalTest : FunSpec({
 
         // then
         result.output shouldContain "commitRef"
-        result.output shouldContain "monorepoBuild.commitRef"
+        result.output shouldContain "monorepo.commitRef"
     }
 
     test("writeChangedProjectsFromRef writes changed project paths to default output file") {
@@ -45,7 +45,7 @@ class WriteChangedProjectsFromRefFunctionalTest : FunSpec({
         // when
         val result = project.runTaskWithProperties(
             "writeChangedProjectsFromRef",
-            properties = mapOf("monorepoBuild.commitRef" to initialSha)
+            properties = mapOf("monorepo.commitRef" to initialSha)
         )
 
         // then
@@ -73,7 +73,7 @@ class WriteChangedProjectsFromRefFunctionalTest : FunSpec({
         // when: compare HEAD against itself — no changes
         val result = project.runTaskWithProperties(
             "writeChangedProjectsFromRef",
-            properties = mapOf("monorepoBuild.commitRef" to headSha)
+            properties = mapOf("monorepo.commitRef" to headSha)
         )
 
         // then: task succeeds and output file exists but is empty
@@ -100,8 +100,8 @@ class WriteChangedProjectsFromRefFunctionalTest : FunSpec({
         val result = project.runTaskWithProperties(
             "writeChangedProjectsFromRef",
             properties = mapOf(
-                "monorepoBuild.commitRef" to initialSha,
-                "monorepoBuild.outputFile" to customPath
+                "monorepo.commitRef" to initialSha,
+                "monorepo.outputFile" to customPath
             )
         )
 
@@ -128,7 +128,7 @@ class WriteChangedProjectsFromRefFunctionalTest : FunSpec({
         // when
         project.runTaskWithProperties(
             "writeChangedProjectsFromRef",
-            properties = mapOf("monorepoBuild.commitRef" to initialSha)
+            properties = mapOf("monorepo.commitRef" to initialSha)
         )
 
         // then: each line is a bare Gradle project path — no headers, annotations, or indentation
@@ -157,7 +157,7 @@ class WriteChangedProjectsFromRefFunctionalTest : FunSpec({
         // when
         project.runTaskWithProperties(
             "writeChangedProjectsFromRef",
-            properties = mapOf("monorepoBuild.commitRef" to initialSha)
+            properties = mapOf("monorepo.commitRef" to initialSha)
         )
 
         // then

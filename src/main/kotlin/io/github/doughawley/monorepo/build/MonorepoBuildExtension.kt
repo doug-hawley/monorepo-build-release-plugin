@@ -23,7 +23,7 @@ open class MonorepoBuildExtension {
      * when using ref-mode tasks (printChangedProjectsFromRef, buildChangedProjectsFromRef,
      * writeChangedProjectsFromRef). Defaults to "HEAD~1" so ref-mode tasks work out of the
      * box for single-commit pipelines. Can also be supplied at runtime via
-     * -PmonorepoBuild.commitRef=<sha>, which takes precedence over this value.
+     * -Pmonorepo.commitRef=<sha>, which takes precedence over this value.
      */
     var commitRef: String = "HEAD~1"
 

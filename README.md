@@ -27,26 +27,30 @@ plugins {
 ### Builds
 
 ```kotlin
-monorepoBuild {
-    baseBranch = "main"           // branch to compare against for branch-mode tasks; defaults to "main"
-    commitRef = "HEAD~1"          // commit SHA, tag, or ref for ref-mode tasks; defaults to "HEAD~1"; can be overridden at runtime via -PmonorepoBuild.commitRef=<sha>
-    includeUntracked = true       // include files not yet tracked by git; defaults to true (branch-mode only)
-    excludePatterns = listOf(     // regex patterns for files to exclude globally across all projects
-        ".*\\.md",
-        "docs/.*"
-    )
+monorepo {
+    build {
+        baseBranch = "main"           // branch to compare against for branch-mode tasks; defaults to "main"
+        commitRef = "HEAD~1"          // commit SHA, tag, or ref for ref-mode tasks; defaults to "HEAD~1"; can be overridden at runtime via -Pmonorepo.commitRef=<sha>
+        includeUntracked = true       // include files not yet tracked by git; defaults to true (branch-mode only)
+        excludePatterns = listOf(     // regex patterns for files to exclude globally across all projects
+            ".*\\.md",
+            "docs/.*"
+        )
+    }
 }
 ```
 
-Individual subprojects can declare their own exclude patterns using the `monorepoProjectConfig` extension. Patterns are matched against paths relative to the subproject directory and are applied after global `excludePatterns`.
+Individual subprojects can declare their own exclude patterns using the `monorepoProject` extension. Patterns are matched against paths relative to the subproject directory and are applied after global `excludePatterns`.
 
 ```kotlin
 // In :api/build.gradle.kts
-monorepoProjectConfig {
-    excludePatterns = listOf(     // regex patterns relative to this subproject's directory
-        "generated/.*",
-        ".*\\.json"
-    )
+monorepoProject {
+    build {
+        excludePatterns = listOf(     // regex patterns relative to this subproject's directory
+            "generated/.*",
+            ".*\\.json"
+        )
+    }
 }
 ```
 
@@ -75,7 +79,7 @@ Prints a human-readable report of which projects changed since a specific commit
 ./gradlew printChangedProjectsFromRef
 
 # Override with a specific SHA
-./gradlew printChangedProjectsFromRef -PmonorepoBuild.commitRef=abc123
+./gradlew printChangedProjectsFromRef -Pmonorepo.commitRef=abc123
 ```
 
 #### `buildChangedProjectsFromRef`
@@ -87,7 +91,7 @@ Builds all affected projects since a specific commit ref. Defaults to `HEAD~1`, 
 ./gradlew buildChangedProjectsFromRef
 
 # Build what changed since a specific SHA (e.g., last successful CI build)
-./gradlew buildChangedProjectsFromRef -PmonorepoBuild.commitRef=abc123def456
+./gradlew buildChangedProjectsFromRef -Pmonorepo.commitRef=abc123def456
 ```
 
 > **Note:** Ref-mode tasks use a two-dot diff (`git diff <ref> HEAD`), which only considers committed changes. Staged and untracked files are intentionally ignored — this mode is designed for clean CI workspaces.
@@ -97,7 +101,7 @@ Builds all affected projects since a specific commit ref. Defaults to `HEAD~1`, 
 Writes the list of affected project paths to a file — one path per line, no headers or annotations. Designed for consumption by shell scripts in CI/CD pipelines.
 
 ```bash
-./gradlew writeChangedProjectsFromRef -PmonorepoBuild.commitRef=abc123
+./gradlew writeChangedProjectsFromRef -Pmonorepo.commitRef=abc123
 ```
 
 **Default output file:** `build/monorepo/changed-projects.txt`
@@ -115,8 +119,8 @@ An empty file is written when nothing has changed, so downstream scripts can alw
 
 ```bash
 ./gradlew writeChangedProjectsFromRef \
-  -PmonorepoBuild.commitRef=abc123 \
-  -PmonorepoBuild.outputFile=ci/changed-projects.txt
+  -Pmonorepo.commitRef=abc123 \
+  -Pmonorepo.outputFile=ci/changed-projects.txt
 ```
 
 ### Releases
@@ -128,30 +132,36 @@ Each subproject manages its own semantic version using git tags of the form `{gl
 In each subproject's `build.gradle.kts`:
 
 ```kotlin
-monorepoReleaseConfig {
-    enabled = true
+monorepoProject {
+    release {
+        enabled = true
+    }
 }
 ```
 
 The tag prefix is derived automatically from the Gradle path (`:api:core` → `api-core`). Override it if needed:
 
 ```kotlin
-monorepoReleaseConfig {
-    enabled = true
-    tagPrefix = "my-api"
+monorepoProject {
+    release {
+        enabled = true
+        tagPrefix = "my-api"
+    }
 }
 ```
 
 #### Global configuration
 
 ```kotlin
-monorepoRelease {
-    globalTagPrefix = "release"       // prefix for all tags and branches; default "release"
-    primaryBranchScope = "minor"      // version bump on the primary branch; "minor" or "major"; default "minor"
-    releaseBranchPatterns = listOf(   // regex patterns for allowed release branches
-        "^main$",
-        "^release/.*"
-    )
+monorepo {
+    release {
+        globalTagPrefix = "release"       // prefix for all tags and branches; default "release"
+        primaryBranchScope = "minor"      // version bump on the primary branch; "minor" or "major"; default "minor"
+        releaseBranchPatterns = listOf(   // regex patterns for allowed release branches
+            "^main$",
+            "^release/.*"
+        )
+    }
 }
 ```
 
@@ -160,7 +170,7 @@ monorepoRelease {
 Builds all opted-in projects that changed since the configured commit ref, then releases each one:
 
 ```bash
-./gradlew releaseChangedProjects -PmonorepoBuild.commitRef=abc123
+./gradlew releaseChangedProjects -Pmonorepo.commitRef=abc123
 ```
 
 #### `:subproject:release`
@@ -188,14 +198,14 @@ Override the version bump scope (primary branch only):
 
 #### Access changed projects in other tasks
 
-The plugin computes results during the configuration phase, so any task can access them directly from the `monorepoBuild` extension — no `dependsOn` needed:
+The plugin computes results during the configuration phase, so any task can access them directly from the `monorepo` extension — no `dependsOn` needed:
 
 ```kotlin
 tasks.register("customTask") {
     doLast {
         val extension = project.extensions.getByType(
-            io.github.doughawley.monorepo.build.MonorepoBuildExtension::class.java
-        )
+            io.github.doughawley.monorepo.MonorepoExtension::class.java
+        ).build
         val changedProjects = extension.allAffectedProjects
         println("Changed projects: $changedProjects")
 
@@ -218,16 +228,16 @@ tasks.named<io.github.doughawley.monorepo.build.task.WriteChangedProjectsFromRef
 
 ## Configuration Reference
 
-### `monorepoBuild`
+### `monorepo { build { } }`
 
 | Property | Type | Default | Description |
 |----------|------|---------|-------------|
 | `baseBranch` | String | `"main"` | The git branch to compare against (branch-mode tasks) |
-| `commitRef` | String | `"HEAD~1"` | Commit SHA, tag, or ref expression to compare against HEAD (ref-mode tasks). Can also be supplied at runtime via `-PmonorepoBuild.commitRef=<sha>`, which takes precedence over the DSL value |
+| `commitRef` | String | `"HEAD~1"` | Commit SHA, tag, or ref expression to compare against HEAD (ref-mode tasks). Can also be supplied at runtime via `-Pmonorepo.commitRef=<sha>`, which takes precedence over the DSL value |
 | `includeUntracked` | Boolean | `true` | Whether to include untracked files in detection (branch-mode only) |
 | `excludePatterns` | List\<String\> | `[]` | Regex patterns for files to exclude globally across all projects |
 
-### `monorepoProjectConfig`
+### `monorepoProject { build { } }`
 
 Applied per subproject. Patterns are matched against paths **relative to the subproject directory** and applied **after** global `excludePatterns`.
 
@@ -235,7 +245,7 @@ Applied per subproject. Patterns are matched against paths **relative to the sub
 |----------|------|---------|-------------|
 | `excludePatterns` | List\<String\> | `[]` | Regex patterns for files to exclude in this subproject |
 
-### `monorepoRelease`
+### `monorepo { release { } }`
 
 | Property | Type | Default | Description |
 |----------|------|---------|-------------|
@@ -243,7 +253,7 @@ Applied per subproject. Patterns are matched against paths **relative to the sub
 | `primaryBranchScope` | String | `"minor"` | Version bump scope when releasing from the primary branch; `"minor"` or `"major"` |
 | `releaseBranchPatterns` | List\<String\> | `["^main$", "^release/.*"]` | Regex patterns for branches from which releases are permitted |
 
-### `monorepoReleaseConfig`
+### `monorepoProject { release { } }`
 
 Applied per subproject to opt in to release management.
 

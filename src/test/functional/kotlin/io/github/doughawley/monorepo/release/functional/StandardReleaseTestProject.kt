@@ -12,7 +12,7 @@ import java.io.File
  *
  * Project structure:
  * - root project (monorepo-build-release-plugin applied)
- * - :app subproject (monorepoReleaseConfig { enabled = true })
+ * - :app subproject (monorepoProject { release { enabled = true } })
  *
  * Includes a bare git remote in a sibling directory for push testing.
  */
@@ -32,9 +32,11 @@ object StandardReleaseTestProject {
                 id("io.github.doug-hawley.monorepo-build-release-plugin")
             }
 
-            monorepoRelease {
-                globalTagPrefix = "$globalTagPrefix"
-                primaryBranchScope = "$primaryBranchScope"
+            monorepo {
+                release {
+                    globalTagPrefix = "$globalTagPrefix"
+                    primaryBranchScope = "$primaryBranchScope"
+                }
             }
             """.trimIndent()
         )
@@ -65,8 +67,10 @@ object StandardReleaseTestProject {
                 kotlin("jvm") version "2.0.21"
             }
 
-            monorepoReleaseConfig {
-                enabled = true
+            monorepoProject {
+                release {
+                    enabled = true
+                }
             }
             """.trimIndent()
         )
@@ -102,7 +106,7 @@ object StandardReleaseTestProject {
      * Creates a multi-project test setup with root, :app, and :lib subprojects.
      * Both subprojects opt in to releases by default.
      *
-     * @param libEnabled whether :lib has enabled = true in monorepoReleaseConfig
+     * @param libEnabled whether :lib has enabled = true in monorepoProject { release { } }
      * @param primaryBranchScope scope used when releasing from the primary branch (default "minor")
      */
     fun createMultiProject(
@@ -119,9 +123,11 @@ object StandardReleaseTestProject {
                 id("io.github.doug-hawley.monorepo-build-release-plugin")
             }
 
-            monorepoRelease {
-                globalTagPrefix = "$globalTagPrefix"
-                primaryBranchScope = "$primaryBranchScope"
+            monorepo {
+                release {
+                    globalTagPrefix = "$globalTagPrefix"
+                    primaryBranchScope = "$primaryBranchScope"
+                }
             }
             """.trimIndent()
         )
@@ -145,8 +151,10 @@ object StandardReleaseTestProject {
         appDir.mkdirs()
         File(appDir, "build.gradle.kts").writeText(
             """
-            monorepoReleaseConfig {
-                enabled = true
+            monorepoProject {
+                release {
+                    enabled = true
+                }
             }
 
             // Lightweight fake build task: creates the expected artifact so release can proceed
@@ -165,8 +173,10 @@ object StandardReleaseTestProject {
         libDir.mkdirs()
         File(libDir, "build.gradle.kts").writeText(
             """
-            monorepoReleaseConfig {
-                enabled = $libEnabled
+            monorepoProject {
+                release {
+                    enabled = $libEnabled
+                }
             }
 
             // Lightweight fake build task: creates the expected artifact so release can proceed

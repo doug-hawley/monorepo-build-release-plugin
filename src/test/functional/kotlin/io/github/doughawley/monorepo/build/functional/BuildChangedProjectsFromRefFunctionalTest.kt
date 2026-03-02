@@ -25,7 +25,7 @@ class BuildChangedProjectsFromRefFunctionalTest : FunSpec({
 
         // then: error message mentions how to supply commitRef
         result.output shouldContain "commitRef"
-        result.output shouldContain "monorepoBuild.commitRef"
+        result.output shouldContain "monorepo.commitRef"
     }
 
     test("buildChangedProjectsFromRef builds directly changed project") {
@@ -42,7 +42,7 @@ class BuildChangedProjectsFromRefFunctionalTest : FunSpec({
         // when
         val result = project.runTaskWithProperties(
             "buildChangedProjectsFromRef",
-            properties = mapOf("monorepoBuild.commitRef" to initialSha)
+            properties = mapOf("monorepo.commitRef" to initialSha)
         )
 
         // then
@@ -67,7 +67,7 @@ class BuildChangedProjectsFromRefFunctionalTest : FunSpec({
         // when
         val result = project.runTaskWithProperties(
             "buildChangedProjectsFromRef",
-            properties = mapOf("monorepoBuild.commitRef" to initialSha)
+            properties = mapOf("monorepo.commitRef" to initialSha)
         )
 
         // then: common-lib plus all transitive dependents are built
@@ -93,7 +93,7 @@ class BuildChangedProjectsFromRefFunctionalTest : FunSpec({
         // when: compare HEAD against itself — no changes
         val result = project.runTaskWithProperties(
             "buildChangedProjectsFromRef",
-            properties = mapOf("monorepoBuild.commitRef" to headSha)
+            properties = mapOf("monorepo.commitRef" to headSha)
         )
 
         // then
@@ -115,7 +115,7 @@ class BuildChangedProjectsFromRefFunctionalTest : FunSpec({
         // when
         val result = project.runTaskWithProperties(
             "buildChangedProjectsFromRef",
-            properties = mapOf("monorepoBuild.commitRef" to initialSha)
+            properties = mapOf("monorepo.commitRef" to initialSha)
         )
 
         // then: buildChangedProjectsFromRef runs independently

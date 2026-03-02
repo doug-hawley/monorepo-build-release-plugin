@@ -25,7 +25,7 @@ class PrintChangedProjectsFromRefFunctionalTest : FunSpec({
 
         // then: error message mentions how to supply commitRef
         result.output shouldContain "commitRef"
-        result.output shouldContain "monorepoBuild.commitRef"
+        result.output shouldContain "monorepo.commitRef"
     }
 
     test("printChangedProjectsFromRef detects directly changed project using commit SHA") {
@@ -43,7 +43,7 @@ class PrintChangedProjectsFromRefFunctionalTest : FunSpec({
         // when
         val result = project.runTaskWithProperties(
             "printChangedProjectsFromRef",
-            properties = mapOf("monorepoBuild.commitRef" to initialSha)
+            properties = mapOf("monorepo.commitRef" to initialSha)
         )
 
         // then
@@ -66,7 +66,7 @@ class PrintChangedProjectsFromRefFunctionalTest : FunSpec({
         // when
         val result = project.runTaskWithProperties(
             "printChangedProjectsFromRef",
-            properties = mapOf("monorepoBuild.commitRef" to initialSha)
+            properties = mapOf("monorepo.commitRef" to initialSha)
         )
 
         // then: common-lib plus all projects that depend on it are affected
@@ -100,7 +100,7 @@ class PrintChangedProjectsFromRefFunctionalTest : FunSpec({
         // when: compare against the SHA after the first change — only module1 changes are newer
         val result = project.runTaskWithProperties(
             "printChangedProjectsFromRef",
-            properties = mapOf("monorepoBuild.commitRef" to afterFirstChangeSha)
+            properties = mapOf("monorepo.commitRef" to afterFirstChangeSha)
         )
 
         // then: only module1 and its dependents (app1) are affected, not common-lib
@@ -127,10 +127,12 @@ class PrintChangedProjectsFromRefFunctionalTest : FunSpec({
                 id("io.github.doug-hawley.monorepo-build-release-plugin")
             }
 
-            monorepoBuild {
-                baseBranch = "HEAD"
-                includeUntracked = true
-                commitRef = "this-ref-does-not-exist"
+            monorepo {
+                build {
+                    baseBranch = "HEAD"
+                    includeUntracked = true
+                    commitRef = "this-ref-does-not-exist"
+                }
             }
 
             allprojects {
@@ -148,7 +150,7 @@ class PrintChangedProjectsFromRefFunctionalTest : FunSpec({
         // when: valid SHA passed via property overrides the invalid DSL value
         val result = project.runTaskWithProperties(
             "printChangedProjectsFromRef",
-            properties = mapOf("monorepoBuild.commitRef" to initialSha)
+            properties = mapOf("monorepo.commitRef" to initialSha)
         )
 
         // then: property wins and task succeeds, detecting changes
@@ -178,7 +180,7 @@ class PrintChangedProjectsFromRefFunctionalTest : FunSpec({
         // when
         val result = project.runTaskWithProperties(
             "printChangedProjectsFromRef",
-            properties = mapOf("monorepoBuild.commitRef" to initialSha)
+            properties = mapOf("monorepo.commitRef" to initialSha)
         )
 
         // then: no projects reported as changed (staged/untracked changes are invisible to two-dot diff)
@@ -196,7 +198,7 @@ class PrintChangedProjectsFromRefFunctionalTest : FunSpec({
         // when: pass a SHA that does not exist
         val result = project.runTaskWithPropertiesAndFail(
             "printChangedProjectsFromRef",
-            properties = mapOf("monorepoBuild.commitRef" to "deadbeefdeadbeefdeadbeefdeadbeefdeadbeef")
+            properties = mapOf("monorepo.commitRef" to "deadbeefdeadbeefdeadbeefdeadbeefdeadbeef")
         )
 
         // then
@@ -215,7 +217,7 @@ class PrintChangedProjectsFromRefFunctionalTest : FunSpec({
         val result = project.runTaskWithPropertiesAndFail(
             "printChangedProjectsFromBranch",
             "printChangedProjectsFromRef",
-            properties = mapOf("monorepoBuild.commitRef" to "HEAD")
+            properties = mapOf("monorepo.commitRef" to "HEAD")
         )
 
         // then

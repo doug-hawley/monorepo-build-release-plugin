@@ -51,9 +51,11 @@ class TestProjectBuilder(private val projectDir: File) {
                 id("io.github.doug-hawley.monorepo-build-release-plugin")
             }
 
-            monorepoBuild {
-                baseBranch = "$baseBranch"
-                includeUntracked = true
+            monorepo {
+                build {
+                    baseBranch = "$baseBranch"
+                    includeUntracked = true
+                }
             }
 
             allprojects {
@@ -132,8 +134,10 @@ class TestProjectBuilder(private val projectDir: File) {
                 }
                 if (subproject.excludePatterns.isNotEmpty()) {
                     appendLine()
-                    appendLine("monorepoProjectConfig {")
-                    appendLine("    excludePatterns = listOf(${subproject.excludePatterns.joinToString { "\"$it\"" }})")
+                    appendLine("monorepoProject {")
+                    appendLine("    build {")
+                    appendLine("        excludePatterns = listOf(${subproject.excludePatterns.joinToString { "\"$it\"" }})")
+                    appendLine("    }")
                     appendLine("}")
                 }
             }

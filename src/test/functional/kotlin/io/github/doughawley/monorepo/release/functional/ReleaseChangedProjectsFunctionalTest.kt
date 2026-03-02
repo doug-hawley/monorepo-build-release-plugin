@@ -25,7 +25,7 @@ class ReleaseChangedProjectsFunctionalTest : FunSpec({
         // when: HEAD~1 diff covers only the root file — no subproject changes
         val result = project.runTask(
             "releaseChangedProjects",
-            properties = mapOf("monorepoBuild.commitRef" to "HEAD~1")
+            properties = mapOf("monorepo.commitRef" to "HEAD~1")
         )
 
         // then
@@ -46,7 +46,7 @@ class ReleaseChangedProjectsFunctionalTest : FunSpec({
         // when
         val result = project.runTask(
             "releaseChangedProjects",
-            properties = mapOf("monorepoBuild.commitRef" to "HEAD~1")
+            properties = mapOf("monorepo.commitRef" to "HEAD~1")
         )
 
         // then: only app is released; lib is untouched
@@ -69,7 +69,7 @@ class ReleaseChangedProjectsFunctionalTest : FunSpec({
         // when
         val result = project.runTask(
             "releaseChangedProjects",
-            properties = mapOf("monorepoBuild.commitRef" to "HEAD~1")
+            properties = mapOf("monorepo.commitRef" to "HEAD~1")
         )
 
         // then
@@ -97,7 +97,7 @@ class ReleaseChangedProjectsFunctionalTest : FunSpec({
         // when
         val result = project.runTask(
             "releaseChangedProjects",
-            properties = mapOf("monorepoBuild.commitRef" to "HEAD~1")
+            properties = mapOf("monorepo.commitRef" to "HEAD~1")
         )
 
         // then: only app released; lib skipped because it is not opted in
@@ -127,7 +127,7 @@ class ReleaseChangedProjectsFunctionalTest : FunSpec({
         // when
         val result = project.runTask(
             "releaseChangedProjects",
-            properties = mapOf("monorepoBuild.commitRef" to "HEAD~1")
+            properties = mapOf("monorepo.commitRef" to "HEAD~1")
         )
 
         // then: major bump → v1.0.0 for both
@@ -155,8 +155,10 @@ class ReleaseChangedProjectsFunctionalTest : FunSpec({
                 id("io.github.doug-hawley.monorepo-build-release-plugin")
             }
 
-            monorepoRelease {
-                primaryBranchScope = "minor"
+            monorepo {
+                release {
+                    primaryBranchScope = "minor"
+                }
             }
             """.trimIndent()
         )
@@ -173,8 +175,10 @@ class ReleaseChangedProjectsFunctionalTest : FunSpec({
         appDir.mkdirs()
         File(appDir, "build.gradle.kts").writeText(
             """
-            monorepoReleaseConfig {
-                enabled = false
+            monorepoProject {
+                release {
+                    enabled = false
+                }
             }
 
             tasks.register("build") {
@@ -192,8 +196,10 @@ class ReleaseChangedProjectsFunctionalTest : FunSpec({
         libDir.mkdirs()
         File(libDir, "build.gradle.kts").writeText(
             """
-            monorepoReleaseConfig {
-                enabled = false
+            monorepoProject {
+                release {
+                    enabled = false
+                }
             }
 
             tasks.register("build") {
@@ -218,7 +224,7 @@ class ReleaseChangedProjectsFunctionalTest : FunSpec({
         // when
         val result = project.runTask(
             "releaseChangedProjects",
-            properties = mapOf("monorepoBuild.commitRef" to "HEAD~1")
+            properties = mapOf("monorepo.commitRef" to "HEAD~1")
         )
 
         // then
@@ -241,7 +247,7 @@ class ReleaseChangedProjectsFunctionalTest : FunSpec({
         // when
         val result = project.runTask(
             "releaseChangedProjects",
-            properties = mapOf("monorepoBuild.commitRef" to "HEAD~1")
+            properties = mapOf("monorepo.commitRef" to "HEAD~1")
         )
 
         // then: both postRelease tasks ran (UP_TO_DATE = no-op task ran, not SKIPPED due to failure)
@@ -264,7 +270,7 @@ class ReleaseChangedProjectsFunctionalTest : FunSpec({
         // when: --continue lets lib:release run despite app:release failing
         val result = project.runTaskAndFail(
             "releaseChangedProjects", "--continue",
-            properties = mapOf("monorepoBuild.commitRef" to "HEAD~1")
+            properties = mapOf("monorepo.commitRef" to "HEAD~1")
         )
 
         // then: lib was released; app was not (no remote push)

@@ -54,35 +54,29 @@ class MonorepoBuildReleasePlugin @Inject constructor(
             )
         }
 
-        // Register the build extension on the root project to ensure it's shared
-        val rootBuildExtension = if (project == project.rootProject) {
-            project.extensions.create(
-                "monorepoBuild",
-                MonorepoBuildExtension::class.java
-            )
+        // Register the root-level monorepo extension on the root project to ensure it's shared
+        val rootExtension = if (project == project.rootProject) {
+            project.extensions.create("monorepo", MonorepoExtension::class.java)
         } else {
-            project.rootProject.extensions.findByType(MonorepoBuildExtension::class.java)
-                ?: project.rootProject.extensions.create(
-                    "monorepoBuild",
-                    MonorepoBuildExtension::class.java
-                )
+            project.rootProject.extensions.findByType(MonorepoExtension::class.java)
+                ?: project.rootProject.extensions.create("monorepo", MonorepoExtension::class.java)
         }
+        val rootBuildExtension = rootExtension.build
+        val rootReleaseExtension = rootExtension.release
 
-        // Register per-project build exclude extension on every subproject
+        // Register per-project extension on every subproject
         if (project == project.rootProject) {
             project.subprojects.forEach { subproject ->
-                subproject.extensions.create("monorepoProjectConfig", MonorepoProjectConfigExtension::class.java)
+                subproject.extensions.create("monorepoProject", MonorepoProjectExtension::class.java)
             }
         }
 
-        // Register the release extension
-        val rootReleaseExtension = project.extensions.create("monorepoRelease", MonorepoReleaseExtension::class.java)
-
-        // Register per-project opt-in release extension and release tasks eagerly so that build
-        // scripts can configure tasks like postRelease during their own configuration phase.
+        // Register per-subproject release tasks eagerly so that build scripts can configure
+        // tasks like postRelease during their own configuration phase.
         project.subprojects.forEach { sub ->
-            val config = sub.extensions.create("monorepoReleaseConfig", MonorepoReleaseConfigExtension::class.java)
-            registerReleaseTasks(sub, rootReleaseExtension, config)
+            val projectExtension = sub.extensions.findByType(MonorepoProjectExtension::class.java)
+                ?: sub.extensions.create("monorepoProject", MonorepoProjectExtension::class.java)
+            registerReleaseTasks(sub, rootReleaseExtension, projectExtension.release)
         }
 
         // Root-level release aggregator task
@@ -111,8 +105,8 @@ class MonorepoBuildReleasePlugin @Inject constructor(
                         val commitRef = resolveCommitRef(project.rootProject, rootBuildExtension)
                             ?: throw GradleException(
                                 "printChangedProjectsFromRef / buildChangedProjectsFromRef / writeChangedProjectsFromRef / releaseChangedProjects requires " +
-                                "a commitRef. Set it in the monorepoBuild DSL or pass " +
-                                "-PmonorepoBuild.commitRef=<sha>."
+                                "a commitRef. Set it in the monorepo { build { } } DSL or pass " +
+                                "-Pmonorepo.commitRef=<sha>."
                             )
                         rootBuildExtension.commitRef = commitRef
                         computeMetadata(project.rootProject, rootBuildExtension, commitRef)
@@ -139,9 +133,9 @@ class MonorepoBuildReleasePlugin @Inject constructor(
             val buildChangedTask = project.tasks.named("buildChangedProjectsFromRef")
             rootBuildExtension.allAffectedProjects.forEach { projectPath ->
                 val sub = project.rootProject.findProject(projectPath) ?: return@forEach
-                val config = sub.extensions
-                    .findByType(MonorepoReleaseConfigExtension::class.java) ?: return@forEach
-                if (!config.enabled) {
+                val projectExtension = sub.extensions
+                    .findByType(MonorepoProjectExtension::class.java) ?: return@forEach
+                if (!projectExtension.release.enabled) {
                     return@forEach
                 }
                 val releaseTask = sub.tasks.findByName("release") ?: return@forEach
@@ -164,8 +158,8 @@ class MonorepoBuildReleasePlugin @Inject constructor(
             group = BUILD_TASK_GROUP
             description = "Builds only the projects that have been affected by changes"
             doLast {
-                val extension = project.rootProject.extensions.getByType(MonorepoBuildExtension::class.java)
-                if (!extension.metadataComputed) {
+                val ext = project.rootProject.extensions.getByType(MonorepoExtension::class.java).build
+                if (!ext.metadataComputed) {
                     throw IllegalStateException(
                         "Changed project metadata was not computed in the configuration phase. " +
                         "Possible causes: the plugin was not applied to the root project, " +
@@ -173,7 +167,7 @@ class MonorepoBuildReleasePlugin @Inject constructor(
                         "Re-run with --info or --debug for more details."
                     )
                 }
-                val changedProjects = extension.allAffectedProjects
+                val changedProjects = ext.allAffectedProjects
                 if (changedProjects.isEmpty()) {
                     project.logger.lifecycle("No projects have changed - nothing to build")
                 } else {
@@ -191,8 +185,8 @@ class MonorepoBuildReleasePlugin @Inject constructor(
             group = BUILD_TASK_GROUP
             description = "Builds only the projects affected by changes since a specific commit ref"
             doLast {
-                val extension = project.rootProject.extensions.getByType(MonorepoBuildExtension::class.java)
-                if (!extension.metadataComputed) {
+                val ext = project.rootProject.extensions.getByType(MonorepoExtension::class.java).build
+                if (!ext.metadataComputed) {
                     throw IllegalStateException(
                         "Changed project metadata was not computed in the configuration phase. " +
                         "Possible causes: the plugin was not applied to the root project, " +
@@ -200,8 +194,8 @@ class MonorepoBuildReleasePlugin @Inject constructor(
                         "Re-run with --info or --debug for more details."
                     )
                 }
-                val changedProjects = extension.allAffectedProjects
-                val ref = extension.commitRef
+                val changedProjects = ext.allAffectedProjects
+                val ref = ext.commitRef
                 if (changedProjects.isEmpty()) {
                     project.logger.lifecycle("No projects have changed - nothing to build")
                 } else {
@@ -213,7 +207,7 @@ class MonorepoBuildReleasePlugin @Inject constructor(
         project.tasks.register("writeChangedProjectsFromRef", WriteChangedProjectsFromRefTask::class.java).configure {
             group = BUILD_TASK_GROUP
             description = "Writes changed projects since a specific commit ref to a file for CI/CD pipeline consumption"
-            val customPath = project.findProperty("monorepoBuild.outputFile") as? String
+            val customPath = project.findProperty("monorepo.outputFile") as? String
             if (customPath != null) {
                 outputFile.set(project.layout.projectDirectory.file(customPath))
             } else {
@@ -248,7 +242,7 @@ class MonorepoBuildReleasePlugin @Inject constructor(
      * Resolves the commit ref to use, preferring the project property over the DSL value.
      */
     private fun resolveCommitRef(project: Project, extension: MonorepoBuildExtension): String? {
-        val fromProperty = project.findProperty("monorepoBuild.commitRef") as? String
+        val fromProperty = project.findProperty("monorepo.commitRef") as? String
         return (fromProperty ?: extension.commitRef).takeIf { it.isNotBlank() }
     }
 
@@ -331,8 +325,8 @@ class MonorepoBuildReleasePlugin @Inject constructor(
     ): Map<String, List<String>> {
         return changedFilesMap.mapValues { (projectPath, files) ->
             val targetProject = rootProject.findProject(projectPath)
-            val ext = targetProject?.extensions?.findByType(MonorepoProjectConfigExtension::class.java)
-            val patterns = ext?.excludePatterns?.map { Regex(it) } ?: emptyList()
+            val ext = targetProject?.extensions?.findByType(MonorepoProjectExtension::class.java)
+            val patterns = ext?.build?.excludePatterns?.map { Regex(it) } ?: emptyList()
             if (patterns.isEmpty()) {
                 files
             } else {

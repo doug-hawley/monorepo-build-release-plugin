@@ -1,5 +1,6 @@
 package io.github.doughawley.monorepo.build
 
+import io.github.doughawley.monorepo.MonorepoExtension
 import io.github.doughawley.monorepo.build.task.PrintChangedProjectsTask
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.shouldBe
@@ -30,9 +31,9 @@ class MonorepoBuildPluginTest : FunSpec({
         project.pluginManager.apply("io.github.doug-hawley.monorepo-build-release-plugin")
 
         // then
-        val extension = project.extensions.findByName("monorepoBuild")
+        val extension = project.extensions.findByName("monorepo")
         extension shouldNotBe null
-        extension.shouldBeInstanceOf<MonorepoBuildExtension>()
+        extension.shouldBeInstanceOf<MonorepoExtension>()
     }
 
     test("extension has correct defaults") {
@@ -41,7 +42,7 @@ class MonorepoBuildPluginTest : FunSpec({
         project.pluginManager.apply("io.github.doug-hawley.monorepo-build-release-plugin")
 
         // when
-        val extension = project.extensions.getByType(MonorepoBuildExtension::class.java)
+        val extension = project.extensions.getByType(MonorepoExtension::class.java).build
 
         // then
         extension.baseBranch shouldBe "main"
@@ -53,7 +54,7 @@ class MonorepoBuildPluginTest : FunSpec({
         // given
         val project = ProjectBuilder.builder().build()
         project.pluginManager.apply("io.github.doug-hawley.monorepo-build-release-plugin")
-        val extension = project.extensions.getByType(MonorepoBuildExtension::class.java)
+        val extension = project.extensions.getByType(MonorepoExtension::class.java).build
 
         // when
         extension.baseBranch = "develop"
@@ -94,7 +95,7 @@ class MonorepoBuildPluginTest : FunSpec({
             task.detectChanges()
 
             // then
-            val extension = project.extensions.getByType(MonorepoBuildExtension::class.java)
+            val extension = project.extensions.getByType(MonorepoExtension::class.java).build
             extension.allAffectedProjects shouldBe emptySet()
         } finally {
             tempDir.deleteRecursively()

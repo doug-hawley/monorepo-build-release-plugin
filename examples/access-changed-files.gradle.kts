@@ -5,9 +5,11 @@ plugins {
     id("io.github.doug-hawley.monorepo-build-release-plugin") version "0.3.2" // x-release-please-version
 }
 
-monorepoBuild {
-    baseBranch = "main"
-    includeUntracked = true
+monorepo {
+    build {
+        baseBranch = "main"
+        includeUntracked = true
+    }
 }
 
 // The plugin computes results during the configuration phase, so any task can read
@@ -17,8 +19,8 @@ monorepoBuild {
 tasks.register("listChangedProjects") {
     doLast {
         val extension = project.extensions.getByType(
-            io.github.doughawley.monorepo.build.MonorepoBuildExtension::class.java
-        )
+            io.github.doughawley.monorepo.MonorepoExtension::class.java
+        ).build
         println("Changed projects: ${extension.allAffectedProjects.joinToString(", ")}")
     }
 }
@@ -27,8 +29,8 @@ tasks.register("listChangedProjects") {
 tasks.register("listChangedFiles") {
     doLast {
         val extension = project.extensions.getByType(
-            io.github.doughawley.monorepo.build.MonorepoBuildExtension::class.java
-        )
+            io.github.doughawley.monorepo.MonorepoExtension::class.java
+        ).build
 
         println("Changed files by project:")
         extension.changedFilesMap.forEach { (projectPath, files) ->
@@ -44,8 +46,8 @@ tasks.register("listChangedFiles") {
 tasks.register("analyzeChanges") {
     doLast {
         val extension = project.extensions.getByType(
-            io.github.doughawley.monorepo.build.MonorepoBuildExtension::class.java
-        )
+            io.github.doughawley.monorepo.MonorepoExtension::class.java
+        ).build
 
         println("Detailed change analysis:")
         extension.metadataMap.values
@@ -68,8 +70,8 @@ tasks.register("analyzeChanges") {
 tasks.register("smartBuild") {
     doLast {
         val extension = project.extensions.getByType(
-            io.github.doughawley.monorepo.build.MonorepoBuildExtension::class.java
-        )
+            io.github.doughawley.monorepo.MonorepoExtension::class.java
+        ).build
 
         extension.changedFilesMap.forEach { (projectPath, files) ->
             val hasSourceChanges = files.any { it.endsWith(".kt") || it.endsWith(".java") }
@@ -97,8 +99,8 @@ tasks.register("smartBuild") {
 tasks.register("impactReport") {
     doLast {
         val extension = project.extensions.getByType(
-            io.github.doughawley.monorepo.build.MonorepoBuildExtension::class.java
-        )
+            io.github.doughawley.monorepo.MonorepoExtension::class.java
+        ).build
 
         val report = StringBuilder()
         report.appendLine("=" .repeat(80))

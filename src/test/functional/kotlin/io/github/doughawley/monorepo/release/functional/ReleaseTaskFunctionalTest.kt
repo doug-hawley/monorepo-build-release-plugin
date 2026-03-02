@@ -171,7 +171,7 @@ class ReleaseTaskFunctionalTest : FunSpec({
         project.remoteTags() shouldContain "publish/app/v0.1.0"
     }
 
-    test("custom tagPrefix in monorepoReleaseConfig overrides path-derived value") {
+    test("custom tagPrefix in monorepoProject { release { } } overrides path-derived value") {
         // given: set up project with custom tagPrefix
         val projectDir = testListener.getTestProjectDir()
         val remoteDir = File(projectDir.parentFile, "${projectDir.name}-remote.git")
@@ -199,9 +199,11 @@ class ReleaseTaskFunctionalTest : FunSpec({
                 kotlin("jvm") version "2.0.21"
             }
 
-            monorepoReleaseConfig {
-                enabled = true
-                tagPrefix = "my-custom-app"
+            monorepoProject {
+                release {
+                    enabled = true
+                    tagPrefix = "my-custom-app"
+                }
             }
             """.trimIndent()
         )
@@ -247,8 +249,10 @@ class ReleaseTaskFunctionalTest : FunSpec({
             plugins {
                 kotlin("jvm") version "2.0.21"
             }
-            monorepoReleaseConfig {
-                enabled = true
+            monorepoProject {
+                release {
+                    enabled = true
+                }
             }
             """.trimIndent()
         )
@@ -323,8 +327,10 @@ class ReleaseTaskFunctionalTest : FunSpec({
                 id("io.github.doug-hawley.monorepo-build-release-plugin")
             }
 
-            monorepoRelease {
-                releaseBranchPatterns = listOf("^develop${'$'}")
+            monorepo {
+                release {
+                    releaseBranchPatterns = listOf("^develop${'$'}")
+                }
             }
             """.trimIndent()
         )
@@ -342,8 +348,10 @@ class ReleaseTaskFunctionalTest : FunSpec({
             plugins {
                 kotlin("jvm") version "2.0.21"
             }
-            monorepoReleaseConfig {
-                enabled = true
+            monorepoProject {
+                release {
+                    enabled = true
+                }
             }
             """.trimIndent()
         )
@@ -562,8 +570,10 @@ class ReleaseTaskFunctionalTest : FunSpec({
             plugins {
                 kotlin("jvm") version "2.0.21"
             }
-            monorepoReleaseConfig {
-                enabled = true
+            monorepoProject {
+                release {
+                    enabled = true
+                }
             }
             """.trimIndent()
         )
@@ -656,8 +666,10 @@ class ReleaseTaskFunctionalTest : FunSpec({
             plugins {
                 kotlin("jvm") version "2.0.21"
             }
-            monorepoReleaseConfig {
-                enabled = true
+            monorepoProject {
+                release {
+                    enabled = true
+                }
             }
             tasks.named("postRelease") {
                 doLast {
@@ -707,8 +719,10 @@ class ReleaseTaskFunctionalTest : FunSpec({
             plugins {
                 kotlin("jvm") version "2.0.21"
             }
-            monorepoReleaseConfig {
-                enabled = true
+            monorepoProject {
+                release {
+                    enabled = true
+                }
             }
             tasks.named("postRelease") {
                 doLast {
@@ -735,7 +749,7 @@ class ReleaseTaskFunctionalTest : FunSpec({
     // Opt-in model
     // ─────────────────────────────────────────────────────────────
 
-    test("subproject without monorepoReleaseConfig has no release task") {
+    test("subproject without monorepoProject { release { } } has no release task") {
         // given: a project where no subproject has enabled opt-in
         val projectDir = testListener.getTestProjectDir()
         val remoteDir = File(projectDir.parentFile, "${projectDir.name}-remote.git")
@@ -756,7 +770,7 @@ class ReleaseTaskFunctionalTest : FunSpec({
         File(projectDir, ".gitignore").writeText(".gradle/\nbuild/")
         val libDir = File(projectDir, "lib")
         libDir.mkdirs()
-        // No monorepoReleaseConfig block at all
+        // No monorepoProject { release { } } block at all
         File(libDir, "build.gradle.kts").writeText(
             """
             plugins {
@@ -819,8 +833,10 @@ class ReleaseTaskFunctionalTest : FunSpec({
                 id("io.github.doug-hawley.monorepo-build-release-plugin")
             }
 
-            monorepoRelease {
-                releaseBranchPatterns = listOf("^trunk${'$'}")
+            monorepo {
+                release {
+                    releaseBranchPatterns = listOf("^trunk${'$'}")
+                }
             }
             """.trimIndent()
         )
@@ -838,8 +854,10 @@ class ReleaseTaskFunctionalTest : FunSpec({
             plugins {
                 kotlin("jvm") version "2.0.21"
             }
-            monorepoReleaseConfig {
-                enabled = true
+            monorepoProject {
+                release {
+                    enabled = true
+                }
             }
             """.trimIndent()
         )
@@ -896,8 +914,10 @@ class ReleaseTaskFunctionalTest : FunSpec({
             plugins {
                 kotlin("jvm") version "2.0.21"
             }
-            monorepoReleaseConfig {
-                enabled = false
+            monorepoProject {
+                release {
+                    enabled = false
+                }
             }
             """.trimIndent()
         )
@@ -929,8 +949,10 @@ class ReleaseTaskFunctionalTest : FunSpec({
             plugins {
                 id("io.github.doug-hawley.monorepo-build-release-plugin")
             }
-            monorepoRelease {
-                releaseBranchPatterns = listOf("^main${'$'}", "^develop${'$'}", "^release/.*")
+            monorepo {
+                release {
+                    releaseBranchPatterns = listOf("^main${'$'}", "^develop${'$'}", "^release/.*")
+                }
             }
             """.trimIndent()
         )
@@ -948,8 +970,10 @@ class ReleaseTaskFunctionalTest : FunSpec({
             plugins {
                 kotlin("jvm") version "2.0.21"
             }
-            monorepoReleaseConfig {
-                enabled = true
+            monorepoProject {
+                release {
+                    enabled = true
+                }
             }
             """.trimIndent()
         )
@@ -1003,8 +1027,10 @@ class ReleaseTaskFunctionalTest : FunSpec({
                 plugins {
                     kotlin("jvm") version "2.0.21"
                 }
-                monorepoReleaseConfig {
-                    enabled = true
+                monorepoProject {
+                    release {
+                        enabled = true
+                    }
                 }
                 """.trimIndent()
             )

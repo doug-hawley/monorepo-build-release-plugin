@@ -1,7 +1,7 @@
 package io.github.doughawley.monorepo.build.task
 
 import io.github.doughawley.monorepo.build.ChangedProjectsPrinter
-import io.github.doughawley.monorepo.build.MonorepoBuildExtension
+import io.github.doughawley.monorepo.MonorepoExtension
 import org.gradle.api.DefaultTask
 import org.gradle.api.GradleException
 import org.gradle.api.tasks.TaskAction
@@ -18,7 +18,7 @@ abstract class PrintChangedProjectsFromRefTask : DefaultTask() {
 
     @TaskAction
     fun detectChanges() {
-        val extension = project.rootProject.extensions.getByType(MonorepoBuildExtension::class.java)
+        val extension = project.rootProject.extensions.getByType(MonorepoExtension::class.java).build
 
         if (!extension.metadataComputed) {
             throw GradleException(

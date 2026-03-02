@@ -32,7 +32,7 @@ open class ReleaseTask : DefaultTask() {
         if (!projectConfig.enabled) {
             throw GradleException(
                 "Release is not enabled for ${project.path}. " +
-                "Set monorepoReleaseConfig { enabled = true } to opt in."
+                "Set monorepoProject { release { enabled = true } } to opt in."
             )
         }
 
@@ -193,7 +193,7 @@ open class ReleaseTask : DefaultTask() {
 
         val dslScope = Scope.fromString(rootExtension.primaryBranchScope)
             ?: throw GradleException(
-                "Invalid primaryBranchScope in monorepoRelease DSL: " +
+                "Invalid primaryBranchScope in monorepo { release { } } DSL: " +
                 "'${rootExtension.primaryBranchScope}'. " +
                 "Must be one of: major, minor"
             )
