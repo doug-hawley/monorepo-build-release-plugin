@@ -22,7 +22,7 @@ plugins {
 }
 ```
 
-### Change Detection
+### Builds
 
 ```kotlin
 monorepoBuild {
