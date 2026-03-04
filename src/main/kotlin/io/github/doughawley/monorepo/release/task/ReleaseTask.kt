@@ -97,7 +97,8 @@ open class ReleaseTask : DefaultTask() {
 
         // 8. Build outputs check
         val libsDir = project.layout.buildDirectory.dir("libs").get().asFile
-        if (!libsDir.exists() || libsDir.listFiles()?.isEmpty() != false) {
+        val libsFiles = libsDir.listFiles()
+        if (!libsDir.exists() || libsFiles == null || libsFiles.isEmpty()) {
             throw GradleException(
                 "Project must be built before releasing — run ${project.path}:build first."
             )

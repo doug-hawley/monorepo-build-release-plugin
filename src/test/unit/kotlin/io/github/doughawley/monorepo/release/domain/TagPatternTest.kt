@@ -2,8 +2,10 @@ package io.github.doughawley.monorepo.release.domain
 
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.datatest.withData
+import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.matchers.nulls.shouldBeNull
 import io.kotest.matchers.shouldBe
+import io.kotest.matchers.string.shouldContain
 
 private data class FormatTagCase(
     val globalPrefix: String,
@@ -92,6 +94,20 @@ class TagPatternTest : FunSpec({
             val (major, minor) = TagPattern.parseVersionLineFromBranch(branch)
             major shouldBe expectedMajor
             minor shouldBe expectedMinor
+        }
+    }
+
+    context("parseVersionLineFromBranch throws on malformed branch names") {
+        withData(
+            "main",
+            "feature/my-feature",
+            "release/api/bad",
+            "release/api/1.2.x",
+        ) { branch ->
+            val exception = shouldThrow<IllegalArgumentException> {
+                TagPattern.parseVersionLineFromBranch(branch)
+            }
+            exception.message shouldContain branch
         }
     }
 })

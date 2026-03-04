@@ -27,13 +27,12 @@ object TagPattern {
 
     fun parseVersionLineFromBranch(branch: String): Pair<Int, Int> {
         // Expected format: release/<prefix>/v<major>.<minor>.x
-        val parts = branch.split("/")
-        // Last part is like "v1.2.x"
-        val versionPart = parts.last()
-        val cleaned = versionPart.trimStart('v').removeSuffix(".x")
-        val nums = cleaned.split(".")
-        val major = nums[0].toInt()
-        val minor = nums[1].toInt()
-        return Pair(major, minor)
+        val versionPart = branch.substringAfterLast("/")
+        val match = Regex("^v(\\d+)\\.(\\d+)\\.x$").matchEntire(versionPart)
+            ?: throw IllegalArgumentException(
+                "Cannot parse version line from branch '$branch'. " +
+                "Expected format: <prefix>/v<major>.<minor>.x"
+            )
+        return Pair(match.groupValues[1].toInt(), match.groupValues[2].toInt())
     }
 }

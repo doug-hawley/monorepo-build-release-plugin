@@ -34,26 +34,26 @@ class GitChangedFilesDetector(
         val changedFiles = mutableSetOf<String>()
 
         val branchChanges = getChangedFilesSinceBaseBranch(extension.baseBranch)
-        logger.info("Files from branch comparison: ${branchChanges.size}")
+        logger.debug("Files from branch comparison: ${branchChanges.size}")
         changedFiles.addAll(branchChanges)
 
         val workingTreeChanges = gitRepository.workingTreeChanges()
-        logger.info("Working tree changes: ${workingTreeChanges.size}")
+        logger.debug("Working tree changes: ${workingTreeChanges.size}")
         changedFiles.addAll(workingTreeChanges)
 
         val staged = gitRepository.stagedFiles()
-        logger.info("Staged files: ${staged.size}")
+        logger.debug("Staged files: ${staged.size}")
         changedFiles.addAll(staged)
 
         if (extension.includeUntracked) {
             val untracked = gitRepository.untrackedFiles()
-            logger.info("Untracked files: ${untracked.size}")
+            logger.debug("Untracked files: ${untracked.size}")
             changedFiles.addAll(untracked)
         }
 
-        logger.info("Total changed files detected: ${changedFiles.size}")
+        logger.debug("Total changed files detected: ${changedFiles.size}")
         if (changedFiles.isNotEmpty()) {
-            logger.info("Changed files: ${changedFiles.take(5).joinToString(", ")}${if (changedFiles.size > 5) "..." else ""}")
+            logger.debug("Changed files: ${changedFiles.take(5).joinToString(", ")}${if (changedFiles.size > 5) "..." else ""}")
         }
 
         val compiledExcludePatterns = extension.excludePatterns.map { Regex(it) }
