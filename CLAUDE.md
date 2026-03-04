@@ -77,7 +77,8 @@ The functional tests use a standard 5-module dependency tree (`common-lib` ← `
 | `BuildChangedProjectsFromRefFunctionalTest.kt` | `buildChangedProjectsFromRef` |
 | `WriteChangedProjectsFromRefFunctionalTest.kt` | `writeChangedProjectsFromRef` |
 | `ReleaseTaskFunctionalTest.kt` | `release` (per-subproject) |
-| `ReleaseChangedProjectsFunctionalTest.kt` | `releaseChangedProjects` |
+| `CreateReleaseBranchFunctionalTest.kt` | `createReleaseBranch` (per-subproject) |
+| `CreateReleaseBranchesForChangedProjectsFunctionalTest.kt` | `createReleaseBranchesForChangedProjects` |
 
 ## Code Style
 

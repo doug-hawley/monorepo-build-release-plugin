@@ -286,7 +286,7 @@ class ReleaseTaskFunctionalTest : FunSpec({
         val result = project.runTaskAndFail(":app:release")
 
         // then
-        result.output shouldContain "uncommitted changes"
+        result.output shouldContain "Cannot release with uncommitted changes. Please commit or stash all changes before releasing."
     }
 
     test("staged but uncommitted changes causes release to fail") {
@@ -300,7 +300,7 @@ class ReleaseTaskFunctionalTest : FunSpec({
         val result = project.runTaskAndFail(":app:release")
 
         // then
-        result.output shouldContain "uncommitted changes"
+        result.output shouldContain "Cannot release with uncommitted changes. Please commit or stash all changes before releasing."
     }
 
     test("feature branch causes release to fail with clear message") {
@@ -312,8 +312,9 @@ class ReleaseTaskFunctionalTest : FunSpec({
         // when
         val result = project.runTaskAndFail(":app:release")
 
-        // then
-        result.output shouldContain "feature/my-feature"
+        // then: message names the offending branch and tells the user which branches are allowed
+        result.output shouldContain "Cannot release from branch 'feature/my-feature'"
+        result.output shouldContain "Allowed patterns"
     }
 
     test("custom releaseBranchPatterns restricts valid branches") {
@@ -365,8 +366,9 @@ class ReleaseTaskFunctionalTest : FunSpec({
         // when: on 'main' which is not in the custom patterns
         val result = project.runTaskAndFail(":app:release")
 
-        // then
-        result.output shouldContain "main"
+        // then: message names the offending branch and shows the configured allowed patterns
+        result.output shouldContain "Cannot release from branch 'main'"
+        result.output shouldContain "Allowed patterns: ^develop$"
     }
 
     test("tag already exists causes release to fail with clear message") {
@@ -383,8 +385,7 @@ class ReleaseTaskFunctionalTest : FunSpec({
         val result = project.runTaskAndFail(":app:release")
 
         // then
-        result.output shouldContain "release/app/v0.2.0"
-        result.output shouldContain "already exists"
+        result.output shouldContain "Tag 'release/app/v0.2.0' already exists. This version has already been released."
     }
 
     test("build outputs missing causes release to fail mentioning build task") {
@@ -395,7 +396,7 @@ class ReleaseTaskFunctionalTest : FunSpec({
         val result = project.runTaskAndFail(":app:release")
 
         // then
-        result.output shouldContain ":app:build"
+        result.output shouldContain "Project must be built before releasing — run :app:build first."
     }
 
     test("build outputs present allows release to proceed") {
@@ -423,8 +424,7 @@ class ReleaseTaskFunctionalTest : FunSpec({
         val result = project.runTaskAndFail(":app:release", properties = mapOf("release.scope" to "patch"))
 
         // then
-        result.output shouldContain "patch"
-        result.output shouldContain "main"
+        result.output shouldContain "Cannot use scope 'patch' on the main branch. Use 'minor' or 'major' for new feature releases."
     }
 
     test("release branch with -Prelease.scope=minor fails with clear message") {
@@ -440,8 +440,7 @@ class ReleaseTaskFunctionalTest : FunSpec({
         val result = project.runTaskAndFail(":app:release", properties = mapOf("release.scope" to "minor"))
 
         // then
-        result.output shouldContain "minor"
-        result.output shouldContain "release branch"
+        result.output shouldContain "Cannot use scope 'minor' on a release branch. Patch releases only — remove the -Prelease.scope flag or use 'patch'."
     }
 
     test("release branch with -Prelease.scope=major fails with clear message") {
@@ -457,8 +456,7 @@ class ReleaseTaskFunctionalTest : FunSpec({
         val result = project.runTaskAndFail(":app:release", properties = mapOf("release.scope" to "major"))
 
         // then
-        result.output shouldContain "major"
-        result.output shouldContain "release branch"
+        result.output shouldContain "Cannot use scope 'major' on a release branch. Patch releases only — remove the -Prelease.scope flag or use 'patch'."
     }
 
     test("release branch with no scope flag succeeds with PATCH") {
@@ -487,8 +485,7 @@ class ReleaseTaskFunctionalTest : FunSpec({
         val result = project.runTaskAndFail(":app:release", properties = mapOf("release.scope" to "bogus"))
 
         // then
-        result.output shouldContain "Invalid release.scope value"
-        result.output shouldContain "bogus"
+        result.output shouldContain "Invalid release.scope value: 'bogus'. Must be one of: major, minor, patch"
     }
 
     test("DSL primaryBranchScope = \"major\" bumps major version") {
@@ -521,8 +518,7 @@ class ReleaseTaskFunctionalTest : FunSpec({
         val result = project.runTaskAndFail(":app:release")
 
         // then
-        result.output shouldContain "primaryBranchScope"
-        result.output shouldContain "patch"
+        result.output shouldContain "Cannot configure primaryBranchScope as 'patch' on the main branch. Use 'minor' or 'major'."
     }
 
     test("release branch accepts -Prelease.scope=patch and applies patch") {
@@ -597,7 +593,7 @@ class ReleaseTaskFunctionalTest : FunSpec({
         val result = project.runTaskAndFail(":app:release")
 
         // then: push failed, local tag rolled back
-        result.output shouldContain "push"
+        result.output shouldContain "Push failed, rolling back local changes"
         project.localTags() shouldNotContain "release/app/v0.1.0"
     }
 
@@ -805,7 +801,7 @@ class ReleaseTaskFunctionalTest : FunSpec({
         val result = project.runTaskAndFail(":app:release")
 
         // then
-        result.output shouldContain "detached HEAD"
+        result.output shouldContain "Cannot release from a detached HEAD state. Check out a branch before releasing."
     }
 
     test("local release branch collision rolls back the local tag") {

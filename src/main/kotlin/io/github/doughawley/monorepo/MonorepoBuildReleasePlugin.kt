@@ -12,6 +12,7 @@ import io.github.doughawley.monorepo.build.task.PrintChangedProjectsTask
 import io.github.doughawley.monorepo.build.task.WriteChangedProjectsFromRefTask
 import io.github.doughawley.monorepo.release.MonorepoReleaseConfigExtension
 import io.github.doughawley.monorepo.release.MonorepoReleaseExtension
+import io.github.doughawley.monorepo.release.task.CreateReleaseBranchTask
 import io.github.doughawley.monorepo.release.task.ReleaseTask
 import io.github.doughawley.monorepo.git.GitCommandExecutor
 import io.github.doughawley.monorepo.release.git.GitReleaseExecutor
@@ -38,7 +39,7 @@ class MonorepoBuildReleasePlugin @Inject constructor(
             "printChangedProjectsFromRef",
             "buildChangedProjectsFromRef",
             "writeChangedProjectsFromRef",
-            "releaseChangedProjects"
+            "createReleaseBranchesForChangedProjects"
         )
         val BRANCH_TASKS = setOf("printChangedProjectsFromBranch", "buildChangedProjectsFromBranch")
         const val BUILD_TASK_GROUP = "monorepo"
@@ -80,16 +81,15 @@ class MonorepoBuildReleasePlugin @Inject constructor(
         }
 
         // Root-level release aggregator task
-        val releasedProjectPaths = mutableListOf<String>()
-        val releaseChangedProjectsTask = project.tasks.register("releaseChangedProjects") {
+        val branchCreatedProjectPaths = mutableListOf<String>()
+        val createReleaseBranchesTask = project.tasks.register("createReleaseBranchesForChangedProjects") {
             group = RELEASE_TASK_GROUP
-            description = "Releases all opted-in projects that have changed since the configured commit ref"
-            dependsOn(project.tasks.named("buildChangedProjectsFromRef"))
+            description = "Creates release branches for all opted-in projects that have changed since the configured commit ref"
             doLast {
-                if (releasedProjectPaths.isEmpty()) {
-                    logger.lifecycle("No opted-in projects changed — nothing to release.")
+                if (branchCreatedProjectPaths.isEmpty()) {
+                    logger.lifecycle("No opted-in projects changed — no release branches to create.")
                 } else {
-                    logger.lifecycle("Released projects: ${releasedProjectPaths.joinToString(", ")}")
+                    logger.lifecycle("Created release branches for: ${branchCreatedProjectPaths.joinToString(", ")}")
                 }
             }
         }
@@ -104,7 +104,7 @@ class MonorepoBuildReleasePlugin @Inject constructor(
                     if (mode == DetectionMode.FROM_REF) {
                         val commitRef = resolveCommitRef(project.rootProject, rootBuildExtension)
                             ?: throw GradleException(
-                                "printChangedProjectsFromRef / buildChangedProjectsFromRef / writeChangedProjectsFromRef / releaseChangedProjects requires " +
+                                "printChangedProjectsFromRef / buildChangedProjectsFromRef / writeChangedProjectsFromRef / createReleaseBranchesForChangedProjects requires " +
                                 "a commitRef. Set it in the monorepo { build { } } DSL or pass " +
                                 "-Pmonorepo.commitRef=<sha>."
                             )
@@ -127,10 +127,9 @@ class MonorepoBuildReleasePlugin @Inject constructor(
                 }
             }
 
-            // Wire release tasks for opted-in changed projects.
+            // Wire createReleaseBranch tasks for opted-in changed projects.
             // This fires after the metadata computation above (registered second), so
             // allAffectedProjects is already populated.
-            val buildChangedTask = project.tasks.named("buildChangedProjectsFromRef")
             rootBuildExtension.allAffectedProjects.forEach { projectPath ->
                 val sub = project.rootProject.findProject(projectPath) ?: return@forEach
                 val projectExtension = sub.extensions
@@ -138,11 +137,10 @@ class MonorepoBuildReleasePlugin @Inject constructor(
                 if (!projectExtension.release.enabled) {
                     return@forEach
                 }
-                val releaseTask = sub.tasks.findByName("release") ?: return@forEach
-                releasedProjectPaths.add(projectPath)
-                releaseTask.mustRunAfter(buildChangedTask)
-                releaseChangedProjectsTask.configure {
-                    dependsOn(releaseTask)
+                val createReleaseBranchTask = sub.tasks.findByName("createReleaseBranch") ?: return@forEach
+                branchCreatedProjectPaths.add(projectPath)
+                createReleaseBranchesTask.configure {
+                    dependsOn(createReleaseBranchTask)
                 }
             }
         }
@@ -368,6 +366,15 @@ class MonorepoBuildReleasePlugin @Inject constructor(
         val executor = GitCommandExecutor(sub.logger)
         val scanner = GitTagScanner(sub.rootProject.rootDir, executor)
         val releaseExecutor = GitReleaseExecutor(sub.rootProject.rootDir, executor, sub.logger)
+
+        sub.tasks.register("createReleaseBranch", CreateReleaseBranchTask::class.java) {
+            group = RELEASE_TASK_GROUP
+            description = "Creates a versioned release branch for this project from the primary branch"
+            this.rootExtension = rootExtension
+            this.projectConfig = config
+            this.gitTagScanner = scanner
+            this.gitReleaseExecutor = releaseExecutor
+        }
 
         val postRelease = sub.tasks.register("postRelease") {
             group = RELEASE_TASK_GROUP

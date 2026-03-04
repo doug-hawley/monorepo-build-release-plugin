@@ -161,12 +161,12 @@ monorepo {
 }
 ```
 
-#### `releaseChangedProjects`
+#### `createReleaseBranchesForChangedProjects`
 
 Builds all opted-in projects that changed since the configured commit ref, then releases each one:
 
 ```bash
-./gradlew releaseChangedProjects -Pmonorepo.commitRef=abc123
+./gradlew createReleaseBranchesForChangedProjects -Pmonorepo.commitRef=abc123
 ```
 
 #### `:subproject:release`
@@ -219,6 +219,89 @@ tasks.named<io.github.doughawley.monorepo.build.task.WriteChangedProjectsFromRef
     outputFile.set(layout.projectDirectory.file("ci/changed-projects.txt"))
 }
 ```
+
+## Example Usage
+
+This walkthrough uses a three-project monorepo to show how the build and release workflows fit together end-to-end.
+
+```kotlin
+// shared-module/build.gradle.kts — no monorepoProject block; release is opt-in
+
+// app1/build.gradle.kts
+dependencies { implementation(project(":shared-module")) }
+monorepoProject { release { enabled = true } }
+
+// app2/build.gradle.kts
+dependencies { implementation(project(":shared-module")) }
+monorepoProject { release { enabled = true } }
+```
+
+`:shared-module` is an internal module consumed by both apps. It participates in change detection and build impact analysis, but the team doesn't publish it directly — only `:app1` and `:app2` are released.
+
+### Developer workflow
+
+A developer has modified `:shared-module` on a feature branch. To see what's affected before opening a PR:
+
+```bash
+./gradlew printChangedProjectsFromBranch
+```
+
+```
+Changed projects:
+
+  :shared-module
+
+  :app1  (affected via :shared-module)
+  :app2  (affected via :shared-module)
+```
+
+`:app1` and `:app2` appear because they depend on `:shared-module` — the plugin resolves transitive impact automatically from the Gradle dependency graph.
+
+Then build everything affected against the configured `baseBranch` (set in `monorepo { build { } }`, defaults to `"main"`) to verify it compiles before opening the PR:
+
+```bash
+./gradlew buildChangedProjectsFromBranch
+```
+
+### Releasing from main
+
+The PR is merged into `main` and CI triggers on the merge commit. Using the default `HEAD~1` ref, which compares the merge commit against the commit before it:
+
+```bash
+./gradlew createReleaseBranchesForChangedProjects
+```
+
+`:shared-module` changed, so both apps are included via transitive impact. `:shared-module` itself is skipped because it isn't opted in to releases. `createReleaseBranchesForChangedProjects` creates a release branch for each opted-in project — no tags are created at this step.
+
+```
+Created release branches for: :app1, :app2
+```
+
+| Project | Release branch created |
+|---------|------------------------|
+| `:app1` | `release/app1/v0.1.x`  |
+| `:app2` | `release/app2/v0.1.x`  |
+
+A separate CI/CD pipeline configured to trigger on pushes to `release/**` branches then runs `:subproject:release` for each project. That pipeline is responsible for creating the version tag and publishing the artifact:
+
+```bash
+./gradlew :app1:release   # creates tag release/app1/v0.1.0, writes release-version.txt
+./gradlew :app2:release   # creates tag release/app2/v0.1.0, writes release-version.txt
+```
+
+Wire your publish step to the `postRelease` lifecycle hook so it runs automatically after tagging.
+
+> **Tip:** If the pipeline squashes commits or triggers on multiple commits at once, override the ref with `-Pmonorepo.commitRef=<sha>` pointing to the last successful build.
+
+### Patching a release branch
+
+A bug is found in `:app1` after `v0.1.0`. A developer checks out `release/app1/v0.1.x` and commits a fix. Because a release branch is scoped to a single project, CI uses the per-project release task directly:
+
+```bash
+./gradlew :app1:release
+```
+
+The plugin detects it is on a release branch and applies a patch bump. Tag `release/app1/v0.1.1` is created; no new release branch is created, and `:app2` and `:shared-module` are untouched.
 
 ## Configuration Reference
 

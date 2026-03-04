@@ -8,7 +8,7 @@ import io.kotest.matchers.string.shouldContain
 import org.gradle.testkit.runner.TaskOutcome
 import java.io.File
 
-class ReleaseChangedProjectsFunctionalTest : FunSpec({
+class CreateReleaseBranchesForChangedProjectsFunctionalTest : FunSpec({
 
     val testListener = listener(ReleaseTestProjectListener())
 
@@ -16,7 +16,7 @@ class ReleaseChangedProjectsFunctionalTest : FunSpec({
     // No changed projects
     // ─────────────────────────────────────────────────────────────
 
-    test("succeeds with no tags created when no projects have changed") {
+    test("succeeds with no branches created when no projects have changed") {
         // given: two commits so HEAD~1 exists; second commit only touches a root file
         val project = StandardReleaseTestProject.createMultiProjectAndInitialize(testListener.getTestProjectDir())
         project.modifyFile("gradle.properties", "# updated")
@@ -24,20 +24,21 @@ class ReleaseChangedProjectsFunctionalTest : FunSpec({
 
         // when: HEAD~1 diff covers only the root file — no subproject changes
         val result = project.runTask(
-            "releaseChangedProjects",
+            "createReleaseBranchesForChangedProjects",
             properties = mapOf("monorepo.commitRef" to "HEAD~1")
         )
 
         // then
-        result.task(":releaseChangedProjects")?.outcome shouldBe TaskOutcome.SUCCESS
+        result.task(":createReleaseBranchesForChangedProjects")?.outcome shouldBe TaskOutcome.SUCCESS
         project.remoteTags() shouldBe emptyList()
+        project.remoteBranches().filter { it.startsWith("release/") } shouldBe emptyList()
     }
 
     // ─────────────────────────────────────────────────────────────
     // Single project changed
     // ─────────────────────────────────────────────────────────────
 
-    test("releases only the changed opted-in project") {
+    test("creates release branch only for the changed opted-in project") {
         // given
         val project = StandardReleaseTestProject.createMultiProjectAndInitialize(testListener.getTestProjectDir())
         project.modifyFile("app/app.txt", "changed")
@@ -45,21 +46,22 @@ class ReleaseChangedProjectsFunctionalTest : FunSpec({
 
         // when
         val result = project.runTask(
-            "releaseChangedProjects",
+            "createReleaseBranchesForChangedProjects",
             properties = mapOf("monorepo.commitRef" to "HEAD~1")
         )
 
-        // then: only app is released; lib is untouched
-        result.task(":releaseChangedProjects")?.outcome shouldBe TaskOutcome.SUCCESS
-        project.remoteTags() shouldContain "release/app/v0.1.0"
-        project.remoteTags() shouldNotContain "release/lib/v0.1.0"
+        // then: release branch created for app only; lib untouched; no tags created
+        result.task(":createReleaseBranchesForChangedProjects")?.outcome shouldBe TaskOutcome.SUCCESS
+        project.remoteBranches() shouldContain "release/app/v0.1.x"
+        project.remoteBranches() shouldNotContain "release/lib/v0.1.x"
+        project.remoteTags() shouldBe emptyList()
     }
 
     // ─────────────────────────────────────────────────────────────
     // Both projects changed
     // ─────────────────────────────────────────────────────────────
 
-    test("releases all changed opted-in projects and creates release branches") {
+    test("creates release branches for all changed opted-in projects") {
         // given
         val project = StandardReleaseTestProject.createMultiProjectAndInitialize(testListener.getTestProjectDir())
         project.modifyFile("app/app.txt", "changed")
@@ -68,16 +70,15 @@ class ReleaseChangedProjectsFunctionalTest : FunSpec({
 
         // when
         val result = project.runTask(
-            "releaseChangedProjects",
+            "createReleaseBranchesForChangedProjects",
             properties = mapOf("monorepo.commitRef" to "HEAD~1")
         )
 
-        // then
-        result.task(":releaseChangedProjects")?.outcome shouldBe TaskOutcome.SUCCESS
-        project.remoteTags() shouldContain "release/app/v0.1.0"
-        project.remoteTags() shouldContain "release/lib/v0.1.0"
+        // then: release branches created; no tags created
+        result.task(":createReleaseBranchesForChangedProjects")?.outcome shouldBe TaskOutcome.SUCCESS
         project.remoteBranches() shouldContain "release/app/v0.1.x"
         project.remoteBranches() shouldContain "release/lib/v0.1.x"
+        project.remoteTags() shouldBe emptyList()
     }
 
     // ─────────────────────────────────────────────────────────────
@@ -96,21 +97,21 @@ class ReleaseChangedProjectsFunctionalTest : FunSpec({
 
         // when
         val result = project.runTask(
-            "releaseChangedProjects",
+            "createReleaseBranchesForChangedProjects",
             properties = mapOf("monorepo.commitRef" to "HEAD~1")
         )
 
-        // then: only app released; lib skipped because it is not opted in
-        result.task(":releaseChangedProjects")?.outcome shouldBe TaskOutcome.SUCCESS
-        project.remoteTags() shouldContain "release/app/v0.1.0"
-        project.remoteTags() shouldNotContain "release/lib/v0.1.0"
+        // then: only app gets a release branch; lib skipped because it is not opted in
+        result.task(":createReleaseBranchesForChangedProjects")?.outcome shouldBe TaskOutcome.SUCCESS
+        project.remoteBranches() shouldContain "release/app/v0.1.x"
+        project.remoteBranches() shouldNotContain "release/lib/v0.1.x"
     }
 
     // ─────────────────────────────────────────────────────────────
     // Scope override
     // ─────────────────────────────────────────────────────────────
 
-    test("primaryBranchScope=major bumps both projects to v1.0.0") {
+    test("primaryBranchScope=major creates v1.0.x branches when prior v0.x.x tags exist") {
         // given: both projects have a prior v0.1.0 release; scope configured to major
         val project = StandardReleaseTestProject.createMultiProjectAndInitialize(
             testListener.getTestProjectDir(),
@@ -126,25 +127,48 @@ class ReleaseChangedProjectsFunctionalTest : FunSpec({
 
         // when
         val result = project.runTask(
-            "releaseChangedProjects",
+            "createReleaseBranchesForChangedProjects",
             properties = mapOf("monorepo.commitRef" to "HEAD~1")
         )
 
-        // then: major bump → v1.0.0 for both
-        result.task(":releaseChangedProjects")?.outcome shouldBe TaskOutcome.SUCCESS
-        project.remoteTags() shouldContain "release/app/v1.0.0"
-        project.remoteTags() shouldContain "release/lib/v1.0.0"
+        // then: major bump → v1.0.x branches for both; no tags created
+        result.task(":createReleaseBranchesForChangedProjects")?.outcome shouldBe TaskOutcome.SUCCESS
+        project.remoteBranches() shouldContain "release/app/v1.0.x"
+        project.remoteBranches() shouldContain "release/lib/v1.0.x"
+        project.remoteTags().filter { it.startsWith("release/app/v1") || it.startsWith("release/lib/v1") } shouldBe emptyList()
     }
 
     // ─────────────────────────────────────────────────────────────
-    // Tag collision resilience (--continue)
+    // Branch collision resilience (--continue)
     // ─────────────────────────────────────────────────────────────
 
+    test("branch collision on one project does not prevent the other from getting a release branch") {
+        // given: both projects changed; a pre-existing local branch for app causes its createReleaseBranch to fail
+        val project = StandardReleaseTestProject.createMultiProjectAndInitialize(testListener.getTestProjectDir())
+        project.modifyFile("app/app.txt", "changed")
+        project.modifyFile("lib/lib.txt", "changed")
+        project.commitAll("Change both")
+
+        // Pre-create the branch locally so createReleaseBranch fails for app
+        project.createBranch("release/app/v0.1.x")
+        project.checkoutBranch("main")
+
+        // when: --continue lets lib:createReleaseBranch run despite app:createReleaseBranch failing
+        project.runTaskAndFail(
+            "createReleaseBranchesForChangedProjects", "--continue",
+            properties = mapOf("monorepo.commitRef" to "HEAD~1")
+        )
+
+        // then: lib got its branch; app did not (local collision prevented push)
+        project.remoteBranches() shouldContain "release/lib/v0.1.x"
+        project.remoteBranches() shouldNotContain "release/app/v0.1.x"
+    }
+
     // ─────────────────────────────────────────────────────────────
-    // Nothing to release
+    // Nothing to create
     // ─────────────────────────────────────────────────────────────
 
-    test("changed projects with all disabled emits nothing-to-release log and creates no tags") {
+    test("changed projects with all disabled emits nothing-to-create log and creates no branches") {
         // given: both :app and :lib have enabled = false
         val projectDir = testListener.getTestProjectDir()
         val remoteDir = File(projectDir.parentFile, "${projectDir.name}-remote.git")
@@ -223,59 +247,13 @@ class ReleaseChangedProjectsFunctionalTest : FunSpec({
 
         // when
         val result = project.runTask(
-            "releaseChangedProjects",
+            "createReleaseBranchesForChangedProjects",
             properties = mapOf("monorepo.commitRef" to "HEAD~1")
         )
 
         // then
-        result.task(":releaseChangedProjects")?.outcome shouldBe TaskOutcome.SUCCESS
-        project.remoteTags() shouldBe emptyList()
-        result.output shouldContain "nothing to release"
-    }
-
-    // ─────────────────────────────────────────────────────────────
-    // postRelease lifecycle
-    // ─────────────────────────────────────────────────────────────
-
-    test("postRelease runs for all released projects") {
-        // given: both :app and :lib changed
-        val project = StandardReleaseTestProject.createMultiProjectAndInitialize(testListener.getTestProjectDir())
-        project.modifyFile("app/app.txt", "changed")
-        project.modifyFile("lib/lib.txt", "changed")
-        project.commitAll("Change both")
-
-        // when
-        val result = project.runTask(
-            "releaseChangedProjects",
-            properties = mapOf("monorepo.commitRef" to "HEAD~1")
-        )
-
-        // then: both postRelease tasks ran (UP_TO_DATE = no-op task ran, not SKIPPED due to failure)
-        result.task(":releaseChangedProjects")?.outcome shouldBe TaskOutcome.SUCCESS
-        result.task(":app:postRelease")?.outcome shouldBe TaskOutcome.UP_TO_DATE
-        result.task(":lib:postRelease")?.outcome shouldBe TaskOutcome.UP_TO_DATE
-    }
-
-    test("tag collision on one project does not prevent the other from releasing") {
-        // given: both projects changed; a pre-existing local tag for app causes its release to fail
-        val project = StandardReleaseTestProject.createMultiProjectAndInitialize(testListener.getTestProjectDir())
-        project.modifyFile("app/app.txt", "changed")
-        project.modifyFile("lib/lib.txt", "changed")
-        project.commitAll("Change both")
-
-        // Pre-create a local tag that will collide: scanner sees no remote tag → next = v0.1.0
-        // but tagExists check finds the local tag → app:release fails without pushing
-        project.createTag("release/app/v0.1.0")
-
-        // when: --continue lets lib:release run despite app:release failing
-        val result = project.runTaskAndFail(
-            "releaseChangedProjects", "--continue",
-            properties = mapOf("monorepo.commitRef" to "HEAD~1")
-        )
-
-        // then: lib was released; app was not (no remote push)
-        result.task(":lib:release")?.outcome shouldBe TaskOutcome.SUCCESS
-        project.remoteTags() shouldContain "release/lib/v0.1.0"
-        project.remoteTags() shouldNotContain "release/app/v0.1.0"
+        result.task(":createReleaseBranchesForChangedProjects")?.outcome shouldBe TaskOutcome.SUCCESS
+        project.remoteBranches().filter { it.startsWith("release/") } shouldBe emptyList()
+        result.output shouldContain "no release branches to create"
     }
 })
