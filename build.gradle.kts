@@ -15,9 +15,9 @@ repositories {
 
 dependencies {
     implementation(kotlin("stdlib"))
-    testImplementation("io.kotest:kotest-runner-junit5:5.9.1")
-    testImplementation("io.kotest:kotest-assertions-core:5.9.1")
-    testImplementation("io.kotest:kotest-property:5.9.1")
+    testImplementation("io.kotest:kotest-runner-junit5:6.1.4")
+    testImplementation("io.kotest:kotest-assertions-core:6.1.4")
+    testImplementation("io.kotest:kotest-property:6.1.4")
 }
 
 // Configure source sets for unit, integration, and functional tests
@@ -56,21 +56,21 @@ sourceSets {
 // Add dependencies for the test source sets
 dependencies {
     // Unit test dependencies
-    add("unitTestImplementation", "io.kotest:kotest-runner-junit5:5.9.1")
-    add("unitTestImplementation", "io.kotest:kotest-assertions-core:5.9.1")
-    add("unitTestImplementation", "io.kotest:kotest-property:5.9.1")
-    add("unitTestImplementation", "io.kotest:kotest-framework-datatest:5.9.1")
+    add("unitTestImplementation", "io.kotest:kotest-runner-junit5:6.1.4")
+    add("unitTestImplementation", "io.kotest:kotest-assertions-core:6.1.4")
+    add("unitTestImplementation", "io.kotest:kotest-property:6.1.4")
+    add("unitTestImplementation", "io.kotest:kotest-framework-datatest:6.1.4")
     add("unitTestImplementation", "io.mockk:mockk:1.13.12")
 
     // Integration test dependencies
-    add("integrationTestImplementation", "io.kotest:kotest-runner-junit5:5.9.1")
-    add("integrationTestImplementation", "io.kotest:kotest-assertions-core:5.9.1")
+    add("integrationTestImplementation", "io.kotest:kotest-runner-junit5:6.1.4")
+    add("integrationTestImplementation", "io.kotest:kotest-assertions-core:6.1.4")
     add("integrationTestImplementation", "io.mockk:mockk:1.13.12")
 
     // Functional test dependencies
     add("functionalTestImplementation", gradleTestKit())
-    add("functionalTestImplementation", "io.kotest:kotest-runner-junit5:5.9.1")
-    add("functionalTestImplementation", "io.kotest:kotest-assertions-core:5.9.1")
+    add("functionalTestImplementation", "io.kotest:kotest-runner-junit5:6.1.4")
+    add("functionalTestImplementation", "io.kotest:kotest-assertions-core:6.1.4")
 }
 
 // Register unit test task
