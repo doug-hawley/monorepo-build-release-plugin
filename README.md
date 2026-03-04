@@ -101,10 +101,14 @@ Builds all affected projects since a specific commit ref. Defaults to `HEAD~1`, 
 Writes the list of affected project paths to a file — one path per line, no headers or annotations. Designed for consumption by shell scripts in CI/CD pipelines.
 
 ```bash
+# Use the default output path (build/monorepo/changed-projects.txt)
 ./gradlew writeChangedProjectsFromRef -Pmonorepo.commitRef=abc123
-```
 
-**Default output file:** `build/monorepo/changed-projects.txt`
+# Override the output path at runtime (no build script changes needed)
+./gradlew writeChangedProjectsFromRef \
+  -Pmonorepo.commitRef=abc123 \
+  -Pmonorepo.outputFile=ci/changed-projects.txt
+```
 
 Example output:
 ```
@@ -114,14 +118,6 @@ Example output:
 ```
 
 An empty file is written when nothing has changed, so downstream scripts can always assume the file exists after the task runs.
-
-**Override the output path at runtime** (no build script changes needed):
-
-```bash
-./gradlew writeChangedProjectsFromRef \
-  -Pmonorepo.commitRef=abc123 \
-  -Pmonorepo.outputFile=ci/changed-projects.txt
-```
 
 ### Releases
 
@@ -178,12 +174,10 @@ Builds all opted-in projects that changed since the configured commit ref, then 
 Releases a single subproject manually, regardless of whether it changed:
 
 ```bash
+# Release using the default scope
 ./gradlew :api:release
-```
 
-Override the version bump scope (primary branch only):
-
-```bash
+# Override the version bump scope (primary branch only)
 ./gradlew :api:release -Prelease.scope=major
 ```
 
