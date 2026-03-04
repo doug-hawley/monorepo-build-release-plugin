@@ -2,7 +2,7 @@
 // Place this in your root build.gradle.kts
 
 plugins {
-    id("io.github.doug-hawley.monorepo-build-release-plugin") version "0.3.2" // x-release-please-version
+    id("io.github.doug-hawley.monorepo-build-release-plugin") version "0.3.3" // x-release-please-version
 }
 
 monorepo {
