@@ -2,6 +2,7 @@ package io.github.doughawley.monorepo.release.task
 
 import io.github.doughawley.monorepo.release.MonorepoReleaseConfigExtension
 import io.github.doughawley.monorepo.release.MonorepoReleaseExtension
+import io.github.doughawley.monorepo.release.domain.NextVersionResolver
 import io.github.doughawley.monorepo.release.domain.Scope
 import io.github.doughawley.monorepo.release.domain.SemanticVersion
 import io.github.doughawley.monorepo.release.domain.TagPattern
@@ -73,17 +74,13 @@ open class ReleaseTask : DefaultTask() {
             ?: TagPattern.deriveProjectTagPrefix(project.path)
 
         // 6. Scan tags to find next version
-        val latestVersion = if (isReleaseBranch) {
+        val nextVersion = if (isReleaseBranch) {
             val (major, minor) = TagPattern.parseVersionLineFromBranch(currentBranch)
-            gitTagScanner.findLatestVersionInLine(globalPrefix, projectPrefix, major, minor)
+            val latestInLine = gitTagScanner.findLatestVersionInLine(globalPrefix, projectPrefix, major, minor)
+            NextVersionResolver.forReleaseBranch(latestInLine, major, minor, scope)
         } else {
-            gitTagScanner.findLatestVersion(globalPrefix, projectPrefix)
-        }
-
-        val nextVersion = if (latestVersion == null) {
-            SemanticVersion(0, 1, 0)
-        } else {
-            latestVersion.bump(scope)
+            val latestVersion = gitTagScanner.findLatestVersion(globalPrefix, projectPrefix)
+            NextVersionResolver.forPrimaryBranch(latestVersion, scope)
         }
 
         // 7. Tag collision check
