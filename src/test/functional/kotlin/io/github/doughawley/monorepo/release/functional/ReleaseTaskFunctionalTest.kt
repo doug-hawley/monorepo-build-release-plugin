@@ -122,6 +122,43 @@ class ReleaseTaskFunctionalTest : FunSpec({
         project.remoteBranches() shouldNotContain "release/app/v0.1.x.x"
     }
 
+    test("on release branch with no prior tags in that version line creates correct initial version") {
+        // given: v0.1.0 exists on main; release/app/v0.2.x branch exists but has no v0.2.* tags
+        val project = StandardReleaseTestProject.createAndInitialize(testListener.getTestProjectDir())
+        project.createTag("release/app/v0.1.0")
+        project.pushTag("release/app/v0.1.0")
+
+        // Create and switch to a release branch for v0.2.x (no v0.2.* tags exist)
+        project.createBranch("release/app/v0.2.x")
+        project.executeGitPush("release/app/v0.2.x")
+        project.createFakeBuiltArtifact()
+
+        // when
+        val result = project.runTask(":app:release")
+
+        // then: should create v0.2.0, NOT v0.1.0
+        result.task(":app:release")?.outcome shouldBe TaskOutcome.SUCCESS
+        project.remoteTags() shouldContain "release/app/v0.2.0"
+    }
+
+    test("on release branch v1.0.x with no prior tags in that line creates v1.0.0") {
+        // given: higher version line with no prior tags
+        val project = StandardReleaseTestProject.createAndInitialize(testListener.getTestProjectDir())
+        project.createTag("release/app/v0.1.0")
+        project.pushTag("release/app/v0.1.0")
+
+        project.createBranch("release/app/v1.0.x")
+        project.executeGitPush("release/app/v1.0.x")
+        project.createFakeBuiltArtifact()
+
+        // when
+        val result = project.runTask(":app:release")
+
+        // then
+        result.task(":app:release")?.outcome shouldBe TaskOutcome.SUCCESS
+        project.remoteTags() shouldContain "release/app/v1.0.0"
+    }
+
     test("release branch ignores DSL primaryBranchScope and always uses patch") {
         // given: primaryBranchScope=major in DSL should have no effect on a release branch
         val project = StandardReleaseTestProject.createAndInitialize(
