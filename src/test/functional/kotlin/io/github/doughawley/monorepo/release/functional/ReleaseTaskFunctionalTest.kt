@@ -556,6 +556,7 @@ class ReleaseTaskFunctionalTest : FunSpec({
         runGit("git", "checkout", "-b", "release/app/v0.1.x")
         runGit("git", "add", ".")
         runGit("git", "commit", "-m", "Initial commit")
+        runGit("git", "tag", "monorepo/last-successful-build")
         project.createFakeBuiltArtifact()
 
         // when

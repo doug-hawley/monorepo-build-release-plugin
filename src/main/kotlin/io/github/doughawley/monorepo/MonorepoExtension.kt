@@ -10,8 +10,8 @@ import org.gradle.api.Action
  * Usage in the root build.gradle.kts:
  * ```
  * monorepo {
+ *     primaryBranch = "main"
  *     build {
- *         baseBranch = "main"
  *         excludePatterns = listOf(".*\\.md")
  *     }
  *     release {
@@ -22,6 +22,14 @@ import org.gradle.api.Action
  * ```
  */
 open class MonorepoExtension {
+
+    /**
+     * The primary integration branch name (e.g. "main", "master", "develop").
+     * Used as fallback ref (`origin/<primaryBranch>`) when the last-successful-build tag
+     * doesn't exist, and as the branch guard for CI tasks like
+     * `buildChangedProjectsAndCreateReleaseBranches`.
+     */
+    var primaryBranch: String = "main"
 
     /**
      * Change detection configuration.

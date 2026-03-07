@@ -33,10 +33,10 @@ class MonorepoPluginNestedProjectFunctionalTest : FunSpec({
         // when
         project.appendToFile("services/billing/api/src/main/kotlin/com/example/Api.kt", "\n// Modified")
         project.commitAll("Change billing api")
-        val result = project.runTask("printChangedProjectsFromBranch")
+        val result = project.runTask("printChangedProjects")
 
         // then
-        result.task(":printChangedProjectsFromBranch")?.outcome shouldBe org.gradle.testkit.runner.TaskOutcome.SUCCESS
+        result.task(":printChangedProjects")?.outcome shouldBe org.gradle.testkit.runner.TaskOutcome.SUCCESS
         val changed = result.extractChangedProjects()
         changed shouldContain ":services:billing:api"
     }
@@ -48,10 +48,10 @@ class MonorepoPluginNestedProjectFunctionalTest : FunSpec({
         // when
         project.appendToFile("services/billing/api/src/main/kotlin/com/example/Api.kt", "\n// Modified")
         project.commitAll("Change billing api")
-        val result = project.runTask("printChangedProjectsFromBranch")
+        val result = project.runTask("printChangedProjects")
 
         // then
-        result.task(":printChangedProjectsFromBranch")?.outcome shouldBe org.gradle.testkit.runner.TaskOutcome.SUCCESS
+        result.task(":printChangedProjects")?.outcome shouldBe org.gradle.testkit.runner.TaskOutcome.SUCCESS
         val changed = result.extractChangedProjects()
         changed shouldContainAll setOf(
             ":services:billing:api",
@@ -68,10 +68,10 @@ class MonorepoPluginNestedProjectFunctionalTest : FunSpec({
         // when
         project.appendToFile("services/payments/gateway/src/main/kotlin/com/example/Gateway.kt", "\n// Modified")
         project.commitAll("Change payments gateway")
-        val result = project.runTask("printChangedProjectsFromBranch")
+        val result = project.runTask("printChangedProjects")
 
         // then
-        result.task(":printChangedProjectsFromBranch")?.outcome shouldBe org.gradle.testkit.runner.TaskOutcome.SUCCESS
+        result.task(":printChangedProjects")?.outcome shouldBe org.gradle.testkit.runner.TaskOutcome.SUCCESS
         val changed = result.extractChangedProjects()
         changed shouldContainAll setOf(":services:payments:gateway", ":apps:web")
         changed shouldNotContain ":services:billing:api"
@@ -85,10 +85,10 @@ class MonorepoPluginNestedProjectFunctionalTest : FunSpec({
         // when
         project.appendToFile("services/billing/impl/src/main/kotlin/com/example/Impl.kt", "\n// Modified")
         project.commitAll("Change billing impl")
-        val result = project.runTask("printChangedProjectsFromBranch")
+        val result = project.runTask("printChangedProjects")
 
         // then
-        result.task(":printChangedProjectsFromBranch")?.outcome shouldBe org.gradle.testkit.runner.TaskOutcome.SUCCESS
+        result.task(":printChangedProjects")?.outcome shouldBe org.gradle.testkit.runner.TaskOutcome.SUCCESS
         val changed = result.extractChangedProjects()
         changed shouldBe setOf(":services:billing:impl")
     }
@@ -100,7 +100,7 @@ class MonorepoPluginNestedProjectFunctionalTest : FunSpec({
         // when
         project.appendToFile("services/payments/gateway/src/main/kotlin/com/example/Gateway.kt", "\n// Modified")
         project.commitAll("Change gateway")
-        val result = project.runTask("printChangedProjectsFromBranch")
+        val result = project.runTask("printChangedProjects")
 
         // then
         val changed = result.extractChangedProjects()

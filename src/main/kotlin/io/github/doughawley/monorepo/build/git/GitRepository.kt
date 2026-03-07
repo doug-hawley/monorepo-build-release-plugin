@@ -49,8 +49,7 @@ open class GitRepository(
                 return diffFromEmptyTree(dir)
             }
             throw IllegalArgumentException(
-                "Commit ref '$commitRef' does not exist in this repository. " +
-                "Check the value passed to commitRef / -Pmonorepo.commitRef."
+                "Commit ref '$commitRef' does not exist in this repository."
             )
         }
         return result.output

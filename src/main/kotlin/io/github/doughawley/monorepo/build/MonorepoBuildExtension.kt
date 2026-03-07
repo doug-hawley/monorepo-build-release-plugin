@@ -8,24 +8,11 @@ import java.util.concurrent.atomic.AtomicBoolean
  */
 open class MonorepoBuildExtension {
     /**
-     * The base branch to compare against when detecting changed files.
-     * Defaults to "main" — override this if your repository uses a different
-     * primary branch name (e.g. "master", "develop", "trunk").
-     *
-     * Supports both local branch names (e.g. "main") and remote refs
-     * (e.g. "origin/main"). A local name is automatically prefixed with
-     * "origin/" before falling back to a local-only comparison.
+     * The tag name that the plugin reads from and writes to for tracking the
+     * last successful build. Change detection compares HEAD against this tag
+     * (or falls back to `origin/<primaryBranch>` when the tag doesn't exist).
      */
-    var baseBranch: String = "main"
-
-    /**
-     * An explicit commit ref (SHA, tag, or ref expression) to compare against HEAD
-     * when using ref-mode tasks (printChangedProjectsFromRef, buildChangedProjectsFromRef).
-     * Defaults to "HEAD~1" so ref-mode tasks work out of the
-     * box for single-commit pipelines. Can also be supplied at runtime via
-     * -Pmonorepo.commitRef=<sha>, which takes precedence over this value.
-     */
-    var commitRef: String = "HEAD~1"
+    var lastSuccessfulBuildTag: String = "monorepo/last-successful-build"
 
     /**
      * Whether to include untracked files in the change detection
@@ -36,6 +23,13 @@ open class MonorepoBuildExtension {
      * File patterns to exclude from change detection
      */
     var excludePatterns: List<String> = listOf()
+
+    /**
+     * The ref that was actually used for change detection (tag or fallback).
+     * Set internally after ref resolution; available for inspection by tasks and build scripts.
+     */
+    var resolvedBaseRef: String = ""
+        internal set
 
     /**
      * All monorepo projects with their metadata and change information.
