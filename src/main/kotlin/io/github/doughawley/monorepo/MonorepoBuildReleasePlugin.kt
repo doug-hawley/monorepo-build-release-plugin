@@ -9,6 +9,9 @@ import io.github.doughawley.monorepo.build.git.GitRepository
 import io.github.doughawley.monorepo.build.task.PrintChangedProjectsTask
 import io.github.doughawley.monorepo.release.MonorepoReleaseConfigExtension
 import io.github.doughawley.monorepo.release.MonorepoReleaseExtension
+import io.github.doughawley.monorepo.release.domain.Scope
+import io.github.doughawley.monorepo.release.domain.TagPattern
+import io.github.doughawley.monorepo.release.git.AtomicReleaseBranchCreator
 import io.github.doughawley.monorepo.release.task.ReleaseTask
 import io.github.doughawley.monorepo.git.GitCommandExecutor
 import io.github.doughawley.monorepo.release.git.GitReleaseExecutor
@@ -77,6 +80,7 @@ class MonorepoBuildReleasePlugin @Inject constructor(
                     rootBuildExtension.resolvedBaseRef = resolvedRef
                     computeMetadata(project.rootProject, rootBuildExtension, resolvedRef)
                     wireDependsOn(project, "buildChangedProjects", rootBuildExtension.allAffectedProjects)
+                    wireDependsOn(project, "buildChangedProjectsAndCreateReleaseBranches", rootBuildExtension.allAffectedProjects)
                     rootBuildExtension.metadataComputed = true
                     project.logger.debug("Changed project metadata computed successfully in configuration phase")
                 } catch (e: GradleException) {
@@ -116,6 +120,69 @@ class MonorepoBuildReleasePlugin @Inject constructor(
                 } else {
                     project.logger.lifecycle("Building changed projects: ${changedProjects.joinToString(", ")}")
                 }
+            }
+        }
+
+        // ── Aggregate release task ────────────────────────────────────────────
+
+        project.tasks.register("buildChangedProjectsAndCreateReleaseBranches").configure {
+            group = RELEASE_TASK_GROUP
+            description = "Builds changed projects and creates release branches atomically"
+            doLast {
+                val ext = project.rootProject.extensions.getByType(MonorepoExtension::class.java)
+                val buildExt = ext.build
+                val releaseExt = ext.release
+
+                if (!buildExt.metadataComputed) {
+                    throw IllegalStateException(
+                        "Changed project metadata was not computed in the configuration phase."
+                    )
+                }
+
+                // Branch guard: must be on primaryBranch
+                val executor = GitCommandExecutor(project.logger)
+                val releaseExecutor = GitReleaseExecutor(project.rootProject.rootDir, executor, project.logger)
+                val currentBranch = releaseExecutor.currentBranch()
+                if (currentBranch != ext.primaryBranch) {
+                    throw GradleException(
+                        "buildChangedProjectsAndCreateReleaseBranches must run on '${ext.primaryBranch}', " +
+                        "but the current branch is '$currentBranch'."
+                    )
+                }
+
+                // Collect opted-in changed projects
+                val changedProjects = buildExt.allAffectedProjects
+                val optedInProjects = changedProjects.mapNotNull { projectPath ->
+                    val targetProject = project.rootProject.findProject(projectPath) ?: return@mapNotNull null
+                    val projectExt = targetProject.extensions.findByType(MonorepoProjectExtension::class.java)
+                        ?: return@mapNotNull null
+                    if (!projectExt.release.enabled) return@mapNotNull null
+                    val tagPrefix = projectExt.release.tagPrefix
+                        ?: TagPattern.deriveProjectTagPrefix(projectPath)
+                    projectPath to tagPrefix
+                }.toMap()
+
+                if (optedInProjects.isEmpty()) {
+                    project.logger.lifecycle("No opted-in changed projects — no release branches to create")
+                    return@doLast
+                }
+
+                // Resolve scope
+                val scope = Scope.fromString(releaseExt.primaryBranchScope)
+                    ?: throw GradleException(
+                        "Invalid primaryBranchScope: '${releaseExt.primaryBranchScope}'. " +
+                        "Must be one of: major, minor"
+                    )
+                if (scope == Scope.PATCH) {
+                    throw GradleException(
+                        "Cannot use primaryBranchScope 'patch'. Use 'minor' or 'major'."
+                    )
+                }
+
+                // Atomic branch creation
+                val tagScanner = GitTagScanner(project.rootProject.rootDir, executor)
+                val branchCreator = AtomicReleaseBranchCreator(releaseExecutor, tagScanner, project.logger)
+                branchCreator.createReleaseBranches(optedInProjects, releaseExt.globalTagPrefix, scope)
             }
         }
 
