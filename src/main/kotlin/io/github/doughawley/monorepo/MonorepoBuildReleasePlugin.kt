@@ -1,17 +1,14 @@
 package io.github.doughawley.monorepo
 
 import io.github.doughawley.monorepo.build.MonorepoBuildExtension
-import io.github.doughawley.monorepo.build.MonorepoProjectConfigExtension
 import io.github.doughawley.monorepo.build.domain.MonorepoProjects
 import io.github.doughawley.monorepo.build.domain.ProjectFileMapper
 import io.github.doughawley.monorepo.build.domain.ProjectMetadataFactory
 import io.github.doughawley.monorepo.build.git.GitChangedFilesDetector
 import io.github.doughawley.monorepo.build.git.GitRepository
-import io.github.doughawley.monorepo.build.task.PrintChangedProjectsFromRefTask
 import io.github.doughawley.monorepo.build.task.PrintChangedProjectsTask
 import io.github.doughawley.monorepo.release.MonorepoReleaseConfigExtension
 import io.github.doughawley.monorepo.release.MonorepoReleaseExtension
-import io.github.doughawley.monorepo.release.task.CreateReleaseBranchTask
 import io.github.doughawley.monorepo.release.task.ReleaseTask
 import io.github.doughawley.monorepo.git.GitCommandExecutor
 import io.github.doughawley.monorepo.release.git.GitReleaseExecutor
@@ -31,15 +28,7 @@ class MonorepoBuildReleasePlugin @Inject constructor(
     private val buildFeatures: BuildFeatures
 ) : Plugin<Project> {
 
-    private enum class DetectionMode { FROM_BRANCH, FROM_REF }
-
     private companion object {
-        val REF_TASKS = setOf(
-            "printChangedProjectsFromRef",
-            "buildChangedProjectsFromRef",
-            "createReleaseBranchesForChangedProjects"
-        )
-        val BRANCH_TASKS = setOf("printChangedProjectsFromBranch", "buildChangedProjectsFromBranch")
         const val BUILD_TASK_GROUP = "monorepo"
         const val RELEASE_TASK_GROUP = "monorepo-release"
     }
@@ -78,41 +67,16 @@ class MonorepoBuildReleasePlugin @Inject constructor(
             registerReleaseTasks(sub, rootReleaseExtension, projectExtension.release)
         }
 
-        // Root-level release aggregator task
-        val branchCreatedProjectPaths = mutableListOf<String>()
-        val createReleaseBranchesTask = project.tasks.register("createReleaseBranchesForChangedProjects") {
-            group = RELEASE_TASK_GROUP
-            description = "Creates release branches for all opted-in projects that have changed since the configured commit ref"
-            doLast {
-                if (branchCreatedProjectPaths.isEmpty()) {
-                    logger.lifecycle("No opted-in projects changed — no release branches to create.")
-                } else {
-                    logger.lifecycle("Created release branches for: ${branchCreatedProjectPaths.joinToString(", ")}")
-                }
-            }
-        }
-
         // Compute metadata in configuration phase after ALL projects are evaluated.
         // Under --parallel, multiple threads may fire this callback concurrently.
         // computationGuard.compareAndSet(false, true) ensures only the first thread proceeds.
         project.gradle.projectsEvaluated {
             if (rootBuildExtension.computationGuard.compareAndSet(false, true)) {
                 try {
-                    val mode = resolveMode(project.rootProject)
-                    if (mode == DetectionMode.FROM_REF) {
-                        val commitRef = resolveCommitRef(project.rootProject, rootBuildExtension)
-                            ?: throw GradleException(
-                                "printChangedProjectsFromRef / buildChangedProjectsFromRef / createReleaseBranchesForChangedProjects requires " +
-                                "a commitRef. Set it in the monorepo { build { } } DSL or pass " +
-                                "-Pmonorepo.commitRef=<sha>."
-                            )
-                        rootBuildExtension.commitRef = commitRef
-                        computeMetadata(project.rootProject, rootBuildExtension, commitRef)
-                        wireDependsOn(project, "buildChangedProjectsFromRef", rootBuildExtension.allAffectedProjects)
-                    } else {
-                        computeMetadata(project.rootProject, rootBuildExtension, commitRef = null)
-                        wireDependsOn(project, "buildChangedProjectsFromBranch", rootBuildExtension.allAffectedProjects)
-                    }
+                    val resolvedRef = resolveBaseRef(project.rootProject, rootExtension)
+                    rootBuildExtension.resolvedBaseRef = resolvedRef
+                    computeMetadata(project.rootProject, rootBuildExtension, resolvedRef)
+                    wireDependsOn(project, "buildChangedProjects", rootBuildExtension.allAffectedProjects)
                     rootBuildExtension.metadataComputed = true
                     project.logger.debug("Changed project metadata computed successfully in configuration phase")
                 } catch (e: GradleException) {
@@ -124,33 +88,16 @@ class MonorepoBuildReleasePlugin @Inject constructor(
                     )
                 }
             }
-
-            // Wire createReleaseBranch tasks for opted-in changed projects.
-            // This fires after the metadata computation above (registered second), so
-            // allAffectedProjects is already populated.
-            rootBuildExtension.allAffectedProjects.forEach { projectPath ->
-                val sub = project.rootProject.findProject(projectPath) ?: return@forEach
-                val projectExtension = sub.extensions
-                    .findByType(MonorepoProjectExtension::class.java) ?: return@forEach
-                if (!projectExtension.release.enabled) {
-                    return@forEach
-                }
-                val createReleaseBranchTask = sub.tasks.findByName("createReleaseBranch") ?: return@forEach
-                branchCreatedProjectPaths.add(projectPath)
-                createReleaseBranchesTask.configure {
-                    dependsOn(createReleaseBranchTask)
-                }
-            }
         }
 
         // ── Build tasks ──────────────────────────────────────────────────────────
 
-        project.tasks.register("printChangedProjectsFromBranch", PrintChangedProjectsTask::class.java).configure {
+        project.tasks.register("printChangedProjects", PrintChangedProjectsTask::class.java).configure {
             group = BUILD_TASK_GROUP
             description = "Detects which projects have changed based on git history"
         }
 
-        project.tasks.register("buildChangedProjectsFromBranch").configure {
+        project.tasks.register("buildChangedProjects").configure {
             group = BUILD_TASK_GROUP
             description = "Builds only the projects that have been affected by changes"
             doLast {
@@ -172,63 +119,26 @@ class MonorepoBuildReleasePlugin @Inject constructor(
             }
         }
 
-        project.tasks.register("printChangedProjectsFromRef", PrintChangedProjectsFromRefTask::class.java).configure {
-            group = BUILD_TASK_GROUP
-            description = "Detects which projects changed since a specific commit ref"
-        }
-
-        project.tasks.register("buildChangedProjectsFromRef").configure {
-            group = BUILD_TASK_GROUP
-            description = "Builds only the projects affected by changes since a specific commit ref"
-            doLast {
-                val ext = project.rootProject.extensions.getByType(MonorepoExtension::class.java).build
-                if (!ext.metadataComputed) {
-                    throw IllegalStateException(
-                        "Changed project metadata was not computed in the configuration phase. " +
-                        "Possible causes: the plugin was not applied to the root project, " +
-                        "or an error occurred during project evaluation. " +
-                        "Re-run with --info or --debug for more details."
-                    )
-                }
-                val changedProjects = ext.allAffectedProjects
-                val ref = ext.commitRef
-                if (changedProjects.isEmpty()) {
-                    project.logger.lifecycle("No projects have changed - nothing to build")
-                } else {
-                    project.logger.lifecycle("Building changed projects (since $ref): ${changedProjects.joinToString(", ")}")
-                }
-            }
-        }
-
         project.logger.info("Monorepo Build & Release Plugin applied to ${project.name}")
     }
 
     /**
-     * Determines which detection mode to use based on the tasks requested in this invocation.
-     * Fails fast if both branch-mode and ref-mode tasks appear in the same invocation.
+     * Resolves the base ref for change detection.
+     * Uses the last-successful-build tag if it exists, otherwise falls back to origin/<primaryBranch>.
      */
-    private fun resolveMode(project: Project): DetectionMode {
-        val requested = project.gradle.startParameter.taskNames
-            .map { it.substringAfterLast(":") }
-            .toSet()
-        val wantsRef = requested.any { it in REF_TASKS }
-        val wantsBranch = requested.any { it in BRANCH_TASKS }
-        if (wantsRef && wantsBranch) {
-            throw GradleException(
-                "Cannot run branch-mode and ref-mode tasks in the same invocation. " +
-                "Run printChangedProjectsFromBranch/buildChangedProjectsFromBranch OR " +
-                "printChangedProjectsFromRef/buildChangedProjectsFromRef — not both."
-            )
-        }
-        return if (wantsRef) DetectionMode.FROM_REF else DetectionMode.FROM_BRANCH
-    }
+    private fun resolveBaseRef(project: Project, rootExtension: MonorepoExtension): String {
+        val buildExtension = rootExtension.build
+        val gitRepository = GitRepository(project.rootDir, project.logger)
+        val tag = buildExtension.lastSuccessfulBuildTag
 
-    /**
-     * Resolves the commit ref to use, preferring the project property over the DSL value.
-     */
-    private fun resolveCommitRef(project: Project, extension: MonorepoBuildExtension): String? {
-        val fromProperty = project.findProperty("monorepo.commitRef") as? String
-        return (fromProperty ?: extension.commitRef).takeIf { it.isNotBlank() }
+        if (gitRepository.refExists(tag)) {
+            project.logger.info("Using last-successful-build tag '$tag' as base ref")
+            return tag
+        }
+
+        val fallback = "origin/${rootExtension.primaryBranch}"
+        project.logger.info("Tag '$tag' not found, falling back to '$fallback'")
+        return fallback
     }
 
     /**
@@ -257,15 +167,11 @@ class MonorepoBuildReleasePlugin @Inject constructor(
      * Computes changed project metadata.
      * Called during the configuration phase to ensure all dependencies are fully resolved.
      */
-    internal fun computeMetadata(project: Project, extension: MonorepoBuildExtension, commitRef: String? = null) {
+    internal fun computeMetadata(project: Project, extension: MonorepoBuildExtension, resolvedBaseRef: String) {
         val logger = project.logger
 
         logger.info("Computing changed project metadata...")
-        if (commitRef != null) {
-            logger.info("Commit ref: $commitRef")
-        } else {
-            logger.info("Base branch: ${extension.baseBranch}")
-        }
+        logger.info("Resolved base ref: $resolvedBaseRef")
         logger.info("Include untracked: ${extension.includeUntracked}")
 
         val gitRepository = GitRepository(project.rootDir, logger)
@@ -273,11 +179,7 @@ class MonorepoBuildReleasePlugin @Inject constructor(
         val projectMapper = ProjectFileMapper()
         val metadataFactory = ProjectMetadataFactory(logger)
 
-        val changedFiles = if (commitRef != null) {
-            gitDetector.getChangedFilesFromRef(commitRef, extension.excludePatterns)
-        } else {
-            gitDetector.getChangedFiles(extension)
-        }
+        val changedFiles = gitDetector.getChangedFiles(resolvedBaseRef, extension.includeUntracked, extension.excludePatterns)
         val changedFilesMap = projectMapper.mapChangedFilesToProjects(project.rootProject, changedFiles)
         val filteredChangedFilesMap = applyPerProjectExcludes(project.rootProject, changedFilesMap, logger)
         val metadataMap = metadataFactory.buildProjectMetadataMap(project.rootProject, filteredChangedFilesMap)
@@ -353,15 +255,6 @@ class MonorepoBuildReleasePlugin @Inject constructor(
         val executor = GitCommandExecutor(sub.logger)
         val scanner = GitTagScanner(sub.rootProject.rootDir, executor)
         val releaseExecutor = GitReleaseExecutor(sub.rootProject.rootDir, executor, sub.logger)
-
-        sub.tasks.register("createReleaseBranch", CreateReleaseBranchTask::class.java) {
-            group = RELEASE_TASK_GROUP
-            description = "Creates a versioned release branch for this project from the primary branch"
-            this.rootExtension = rootExtension
-            this.projectConfig = config
-            this.gitTagScanner = scanner
-            this.gitReleaseExecutor = releaseExecutor
-        }
 
         val postRelease = sub.tasks.register("postRelease") {
             group = RELEASE_TASK_GROUP

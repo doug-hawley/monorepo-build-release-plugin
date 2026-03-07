@@ -44,7 +44,6 @@ class TestProjectBuilder(private val projectDir: File) {
 
     fun build(): TestProject {
         // Create root build.gradle.kts
-        val baseBranch = if (useRemote) "origin/main" else "HEAD"
         val rootBuild = if (pluginApplied) {
             """
             plugins {
@@ -53,7 +52,6 @@ class TestProjectBuilder(private val projectDir: File) {
 
             monorepo {
                 build {
-                    baseBranch = "$baseBranch"
                     includeUntracked = true
                 }
             }
@@ -265,6 +263,10 @@ class TestProject(
         return gradleRunner().withArguments(args).buildAndFail()
     }
 
+    fun executeGitCommand(vararg args: String) {
+        executeCommand("git", *args)
+    }
+
     fun getLastCommitSha(): String {
         val process = ProcessBuilder("git", "rev-parse", "HEAD")
             .directory(projectDir)
@@ -322,22 +324,6 @@ fun BuildResult.extractDirectlyChangedProjects(): Set<String> {
 
 fun BuildResult.extractBuiltProjects(): Set<String> {
     val regex = """Building changed projects: (.*)""".toRegex()
-    val match = regex.find(output)
-    val projectsString = match?.groupValues?.get(1)?.trim() ?: ""
-
-    return if (projectsString.isEmpty()) {
-        emptySet()
-    } else {
-        projectsString
-            .split(", ")
-            .map { it.trim() }
-            .filter { it.isNotEmpty() }
-            .toSet()
-    }
-}
-
-fun BuildResult.extractBuiltProjectsFromRef(): Set<String> {
-    val regex = """Building changed projects \(since [^)]+\): (.*)""".toRegex()
     val match = regex.find(output)
     val projectsString = match?.groupValues?.get(1)?.trim() ?: ""
 

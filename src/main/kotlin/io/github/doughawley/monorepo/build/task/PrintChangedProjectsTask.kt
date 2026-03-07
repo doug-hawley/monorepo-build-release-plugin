@@ -1,10 +1,9 @@
 package io.github.doughawley.monorepo.build.task
 
 import io.github.doughawley.monorepo.build.ChangedProjectsPrinter
-import io.github.doughawley.monorepo.build.MonorepoBuildExtension
-import io.github.doughawley.monorepo.MonorepoBuildReleasePlugin
 import io.github.doughawley.monorepo.MonorepoExtension
 import org.gradle.api.DefaultTask
+import org.gradle.api.GradleException
 import org.gradle.api.tasks.TaskAction
 
 /**
@@ -21,24 +20,18 @@ abstract class PrintChangedProjectsTask : DefaultTask() {
     fun detectChanges() {
         val extension = project.rootProject.extensions.getByType(MonorepoExtension::class.java).build
 
-        // If metadata wasn't computed in configuration phase (e.g., in unit tests),
-        // compute it now as a fallback
         if (!extension.metadataComputed) {
-            logger.warn("Metadata was not computed in configuration phase. Computing now (this may indicate a test environment).")
-            val plugin = project.plugins.findPlugin(MonorepoBuildReleasePlugin::class.java)
-            if (plugin != null) {
-                plugin.computeMetadata(project.rootProject, extension)
-                extension.metadataComputed = true
-            } else {
-                throw IllegalStateException(
-                    "Changed project metadata was not computed and plugin instance not found. " +
-                    "This indicates a plugin initialization error."
-                )
-            }
+            throw GradleException(
+                "Changed project metadata was not computed in the configuration phase. " +
+                "Possible causes: the plugin was not applied to the root project, " +
+                "or an error occurred during project evaluation. " +
+                "Re-run with --info or --debug for more details."
+            )
         }
 
+        val resolvedRef = extension.resolvedBaseRef
         logger.lifecycle(ChangedProjectsPrinter().buildReport(
-            header = "Changed projects:",
+            header = "Changed projects (since $resolvedRef):",
             monorepoProjects = extension.monorepoProjects
         ))
     }

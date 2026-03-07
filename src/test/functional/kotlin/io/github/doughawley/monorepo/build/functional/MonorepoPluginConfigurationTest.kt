@@ -23,14 +23,15 @@ class MonorepoPluginConfigurationTest : FunSpec({
             .build()
         project.initGit()
         project.commitAll("Initial commit")
+        project.executeGitCommand("tag", "monorepo/last-successful-build")
 
         // when: a file matching the :api exclude pattern is created (untracked)
         project.createNewFile("api/generated/Code.kt", "// generated code")
 
-        val result = project.runTask("printChangedProjectsFromBranch")
+        val result = project.runTask("printChangedProjects")
 
         // then: :api is not considered changed because the only changed file is excluded
-        result.task(":printChangedProjectsFromBranch")?.outcome shouldBe TaskOutcome.SUCCESS
+        result.task(":printChangedProjects")?.outcome shouldBe TaskOutcome.SUCCESS
         val changedProjects = result.extractChangedProjects()
         changedProjects shouldNotContain ":api"
     }
@@ -45,15 +46,16 @@ class MonorepoPluginConfigurationTest : FunSpec({
             .build()
         project.initGit()
         project.commitAll("Initial commit")
+        project.executeGitCommand("tag", "monorepo/last-successful-build")
 
         // when: matching files are created in both :api and :core (both untracked)
         project.createNewFile("api/generated/Code.kt", "// generated code")
         project.createNewFile("core/generated/Stub.kt", "// generated stub")
 
-        val result = project.runTask("printChangedProjectsFromBranch")
+        val result = project.runTask("printChangedProjects")
 
         // then: :api is excluded (pattern matches), :core is detected (no pattern)
-        result.task(":printChangedProjectsFromBranch")?.outcome shouldBe TaskOutcome.SUCCESS
+        result.task(":printChangedProjects")?.outcome shouldBe TaskOutcome.SUCCESS
         val changedProjects = result.extractChangedProjects()
         changedProjects shouldNotContain ":api"
         changedProjects shouldContain ":core"
@@ -64,7 +66,7 @@ class MonorepoPluginConfigurationTest : FunSpec({
         val project = testProjectListener.createStandardProject()
 
         // when: a task is run with --configuration-cache enabled
-        val result = project.runTaskAndFail("printChangedProjectsFromBranch", "--configuration-cache")
+        val result = project.runTaskAndFail("printChangedProjects", "--configuration-cache")
 
         // then: the build fails with a clear incompatibility message pointing to the fix
         result.output shouldContain "monorepo-build-release-plugin is incompatible with the Gradle configuration cache"
