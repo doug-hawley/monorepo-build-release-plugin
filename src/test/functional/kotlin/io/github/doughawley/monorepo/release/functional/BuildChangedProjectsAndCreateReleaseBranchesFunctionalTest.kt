@@ -176,6 +176,63 @@ class BuildChangedProjectsAndCreateReleaseBranchesFunctionalTest : FunSpec({
     // All disabled
     // ─────────────────────────────────────────────────────────────
 
+    test("does not update tag when a subproject build fails") {
+        // given: app's build task will throw an error
+        val project = StandardReleaseTestProject.createMultiProjectAndInitialize(testListener.getTestProjectDir())
+        val appBuild = java.io.File(project.projectDir, "app/build.gradle.kts")
+        appBuild.writeText(
+            """
+            monorepoProject {
+                release {
+                    enabled = true
+                }
+            }
+
+            tasks.register("build") {
+                doLast {
+                    throw GradleException("Simulated build failure")
+                }
+            }
+            """.trimIndent()
+        )
+        project.commitAll("Make app build fail")
+        project.createTag("monorepo/last-successful-build")
+        project.pushTag("monorepo/last-successful-build")
+        val tagCommitBefore = project.commitForTag("monorepo/last-successful-build")
+        project.modifyFile("app/app.txt", "changed")
+        project.commitAll("Change app")
+
+        // when
+        val result = project.runTaskAndFail("buildChangedProjectsAndCreateReleaseBranches")
+
+        // then: tag should NOT have moved
+        result.output shouldContain "Simulated build failure"
+        project.remoteBranches().filter { it.startsWith("release/") } shouldBe emptyList()
+        project.remoteTagCommit("monorepo/last-successful-build") shouldBe tagCommitBefore
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    // Fallback to origin/main when tag does not exist
+    // ─────────────────────────────────────────────────────────────
+
+    test("falls back to origin/main when last-successful-build tag does not exist") {
+        // given: no tag, so plugin should fallback to origin/main
+        val project = StandardReleaseTestProject.createMultiProjectAndInitialize(testListener.getTestProjectDir())
+        project.modifyFile("app/app.txt", "changed")
+        project.commitAll("Change app")
+
+        // when
+        val result = project.runTask("buildChangedProjectsAndCreateReleaseBranches")
+
+        // then: should detect changes and create release branch
+        result.task(":buildChangedProjectsAndCreateReleaseBranches")?.outcome shouldBe TaskOutcome.SUCCESS
+        project.remoteBranches() shouldContain "release/app/v0.1.x"
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    // All disabled
+    // ─────────────────────────────────────────────────────────────
+
     test("updates tag but creates no branches when all changed projects have release disabled") {
         // given: both disabled
         val project = StandardReleaseTestProject.createMultiProjectAndInitialize(

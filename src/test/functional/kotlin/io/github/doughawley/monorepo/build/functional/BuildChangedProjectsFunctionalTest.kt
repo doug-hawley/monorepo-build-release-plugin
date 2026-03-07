@@ -254,4 +254,48 @@ class BuildChangedProjectsFunctionalTest : FunSpec({
         result.task(":buildChangedProjects")?.outcome shouldBe TaskOutcome.SUCCESS
         result.output shouldContain "No projects have changed - nothing to build"
     }
+
+    test("buildChangedProjects falls back to origin/main when tag does not exist") {
+        // given: project with remote but no last-successful-build tag
+        val project = StandardTestProject.createAndInitialize(
+            testProjectListener.getTestProjectDir(),
+            withRemote = true
+        )
+        project.appendToFile(Files.APP1_SOURCE, "\n// Modified")
+        project.commitAll("Change app1")
+
+        // when
+        val result = project.runTask("buildChangedProjects")
+
+        // then: falls back to origin/main, detects the change
+        result.task(":buildChangedProjects")?.outcome shouldBe TaskOutcome.SUCCESS
+        val built = result.extractBuiltProjects()
+        built shouldContain Projects.APP1
+    }
+
+    test("buildChangedProjects does not update the last-successful-build tag") {
+        // given: create a tag, make a change, run buildChangedProjects
+        val project = StandardTestProject.createAndInitialize(
+            testProjectListener.getTestProjectDir(),
+            withRemote = true
+        )
+        project.executeGitCommand("tag", "monorepo/last-successful-build")
+        project.executeGitCommand("push", "origin", "monorepo/last-successful-build")
+        val tagCommitBefore = project.getLastCommitSha()
+
+        project.appendToFile(Files.APP2_SOURCE, "\n// Modified")
+        project.commitAll("Change app2")
+
+        // when
+        val result = project.runTask("buildChangedProjects")
+
+        // then: tag should still point at the original commit
+        result.task(":buildChangedProjects")?.outcome shouldBe TaskOutcome.SUCCESS
+        val built = result.extractBuiltProjects()
+        built shouldContain Projects.APP2
+
+        // Verify tag was NOT moved by checking it still resolves to the original commit
+        val tagCommitAfter = project.getLastCommitSha("monorepo/last-successful-build")
+        tagCommitAfter shouldBe tagCommitBefore
+    }
 })

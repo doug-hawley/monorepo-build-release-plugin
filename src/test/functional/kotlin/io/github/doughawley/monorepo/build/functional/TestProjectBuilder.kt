@@ -267,8 +267,8 @@ class TestProject(
         executeCommand("git", *args)
     }
 
-    fun getLastCommitSha(): String {
-        val process = ProcessBuilder("git", "rev-parse", "HEAD")
+    fun getLastCommitSha(ref: String = "HEAD"): String {
+        val process = ProcessBuilder("git", "rev-parse", ref)
             .directory(projectDir)
             .redirectOutput(ProcessBuilder.Redirect.PIPE)
             .start()

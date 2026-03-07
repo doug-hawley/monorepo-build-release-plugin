@@ -236,4 +236,63 @@ class GitReleaseExecutorIntegrationTest : FunSpec({
         // given / when / then — no exception
         executor().deleteLocalBranch("release/app/v9.9.x")
     }
+
+    // branchExistsLocally
+
+    test("branchExistsLocally returns true for a branch that exists") {
+        // given
+        executor().createBranchLocally("release/app/v1.0.x")
+
+        // when / then
+        executor().branchExistsLocally("release/app/v1.0.x") shouldBe true
+    }
+
+    test("branchExistsLocally returns false for a branch that does not exist") {
+        // given / when / then
+        executor().branchExistsLocally("release/nonexistent/v9.9.x") shouldBe false
+    }
+
+    test("branchExistsLocally returns false after a branch is deleted") {
+        // given
+        executor().createBranchLocally("release/app/v1.0.x")
+        executor().deleteLocalBranch("release/app/v1.0.x")
+
+        // when / then
+        executor().branchExistsLocally("release/app/v1.0.x") shouldBe false
+    }
+
+    // pushBranchesAtomically
+
+    test("pushBranchesAtomically pushes all branches to remote in one operation") {
+        // given
+        executor().createBranchLocally("release/app/v1.0.x")
+        executor().createBranchLocally("release/lib/v2.0.x")
+
+        // when
+        executor().pushBranchesAtomically(listOf("release/app/v1.0.x", "release/lib/v2.0.x"))
+
+        // then
+        repoListener.repo.remoteBranchExists("release/app/v1.0.x") shouldBe true
+        repoListener.repo.remoteBranchExists("release/lib/v2.0.x") shouldBe true
+    }
+
+    test("pushBranchesAtomically pushes a single branch") {
+        // given
+        executor().createBranchLocally("release/app/v1.0.x")
+
+        // when
+        executor().pushBranchesAtomically(listOf("release/app/v1.0.x"))
+
+        // then
+        repoListener.repo.remoteBranchExists("release/app/v1.0.x") shouldBe true
+    }
+
+    test("pushBranchesAtomically throws when a branch does not exist locally") {
+        // given / when / then
+        val ex = shouldThrow<GradleException> {
+            executor().pushBranchesAtomically(listOf("release/nonexistent/v1.0.x"))
+        }
+        ex.message shouldContain "Atomic push"
+        ex.message shouldContain "failed"
+    }
 })
