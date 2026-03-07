@@ -142,13 +142,14 @@ This project follows [Kotlin coding conventions](https://kotlinlang.org/docs/cod
 Example:
 ```kotlin
 /**
- * Detects changed files by comparing against a base branch.
+ * Detects changed files by comparing HEAD against a resolved base ref.
  *
- * @param baseBranch The branch to compare against (e.g., "main", "develop")
+ * @param resolvedBaseRef The ref to compare against (tag or origin/branch)
  * @param includeUntracked Whether to include untracked files in the detection
- * @return List of file paths that have changed
+ * @param excludePatterns Regex patterns for files to exclude
+ * @return Set of file paths that have changed
  */
-fun detectChangedFiles(baseBranch: String, includeUntracked: Boolean): List<String>
+fun getChangedFiles(resolvedBaseRef: String, includeUntracked: Boolean, excludePatterns: List<String>): Set<String>
 ```
 
 ## Commit Guidelines
@@ -339,7 +340,7 @@ mkdir test-project
 cd test-project
 git init
 # Create build.gradle.kts with your plugin
-./gradlew printChangedProjectsFromBranch
+./gradlew printChangedProjects
 ```
 
 ### Debugging
@@ -347,7 +348,7 @@ git init
 Run Gradle with debug logging:
 
 ```bash
-./gradlew printChangedProjectsFromBranch --debug
+./gradlew printChangedProjects --debug
 ```
 
 Run tests with IntelliJ IDEA debugger:

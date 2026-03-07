@@ -188,14 +188,16 @@ plugins {
     id("io.github.doug-hawley.monorepo-build-release-plugin") version "0.3.2"
 }
 
-monorepoBuild {
-    baseBranch = "main"
-    includeUntracked = true
+monorepo {
+    primaryBranch = "main"
+    build {
+        includeUntracked = true
+    }
 }
 ```
 
 ```bash
-./gradlew printChangedProjectsFromBranch
+./gradlew printChangedProjects
 ```
 
 ### Update Badges (Optional)

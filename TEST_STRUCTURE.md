@@ -46,12 +46,13 @@ Functional tests verify end-to-end functionality:
 - Tests real-world scenarios with actual git operations
 
 **Current Functional Tests:**
-- `MonorepoPluginDetectionFunctionalTest.kt` - Tests the `printChangedProjectsFromBranch` task
-- `BuildChangedProjectsFunctionalTest.kt` - Tests the `buildChangedProjectsFromBranch` task
+- `PrintChangedProjectsFunctionalTest.kt` - Tests the `printChangedProjects` task
+- `BuildChangedProjectsFunctionalTest.kt` - Tests the `buildChangedProjects` task
 - `MonorepoPluginConfigurationTest.kt` - Configuration and exclude pattern scenarios
-- `PrintChangedProjectsFromRefFunctionalTest.kt` - Tests the ref-mode task
-- `ReleaseChangedProjectsFunctionalTest.kt` - Tests the `releaseChangedProjects` task
-- `ReleaseTaskFunctionalTest.kt` - Release task edge cases
+- `MonorepoPluginHierarchyNodeFunctionalTest.kt` - Hierarchy node detection
+- `MonorepoPluginNestedProjectFunctionalTest.kt` - Nested project detection
+- `ReleaseTaskFunctionalTest.kt` - Per-subproject `release` task
+- `BuildChangedProjectsAndCreateReleaseBranchesFunctionalTest.kt` - Aggregator task with atomic branch creation
 
 **Test Utilities:**
 - `TestProjectBuilder.kt` - Helper for creating test Gradle projects
