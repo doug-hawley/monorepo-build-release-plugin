@@ -1,6 +1,7 @@
 package io.github.doughawley.monorepo
 
 import io.github.doughawley.monorepo.build.MonorepoBuildExtension
+import io.github.doughawley.monorepo.build.git.LastSuccessfulBuildTagUpdater
 import io.github.doughawley.monorepo.build.domain.MonorepoProjects
 import io.github.doughawley.monorepo.build.domain.ProjectFileMapper
 import io.github.doughawley.monorepo.build.domain.ProjectMetadataFactory
@@ -162,8 +163,16 @@ class MonorepoBuildReleasePlugin @Inject constructor(
                     projectPath to tagPrefix
                 }.toMap()
 
+                val tagUpdater = LastSuccessfulBuildTagUpdater(project.rootProject.rootDir, executor, project.logger)
+
+                if (changedProjects.isEmpty()) {
+                    project.logger.lifecycle("No projects have changed — nothing to do")
+                    return@doLast
+                }
+
                 if (optedInProjects.isEmpty()) {
                     project.logger.lifecycle("No opted-in changed projects — no release branches to create")
+                    tagUpdater.updateTag(buildExt.lastSuccessfulBuildTag)
                     return@doLast
                 }
 
@@ -183,6 +192,9 @@ class MonorepoBuildReleasePlugin @Inject constructor(
                 val tagScanner = GitTagScanner(project.rootProject.rootDir, executor)
                 val branchCreator = AtomicReleaseBranchCreator(releaseExecutor, tagScanner, project.logger)
                 branchCreator.createReleaseBranches(optedInProjects, releaseExt.globalTagPrefix, scope)
+
+                // Update last-successful-build tag
+                tagUpdater.updateTag(buildExt.lastSuccessfulBuildTag)
             }
         }
 

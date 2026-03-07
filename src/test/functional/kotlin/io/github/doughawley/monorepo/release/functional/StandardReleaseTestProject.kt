@@ -303,6 +303,32 @@ class ReleaseTestProject(
             .filter { it.isNotBlank() }
     }
 
+    fun headCommit(): String {
+        val process = ProcessBuilder("git", "rev-parse", "HEAD")
+            .directory(projectDir)
+            .redirectOutput(ProcessBuilder.Redirect.PIPE)
+            .start()
+        return process.inputStream.bufferedReader().readText().trim()
+    }
+
+    fun commitForTag(tag: String): String {
+        val process = ProcessBuilder("git", "rev-parse", tag)
+            .directory(projectDir)
+            .redirectOutput(ProcessBuilder.Redirect.PIPE)
+            .start()
+        return process.inputStream.bufferedReader().readText().trim()
+    }
+
+    fun remoteTagCommit(tag: String): String {
+        val process = ProcessBuilder("git", "ls-remote", "--tags", "origin", "refs/tags/$tag")
+            .directory(projectDir)
+            .redirectOutput(ProcessBuilder.Redirect.PIPE)
+            .start()
+        val lines = process.inputStream.bufferedReader().readLines()
+            .filter { it.isNotBlank() && !it.contains("^{}") }
+        return lines.firstOrNull()?.substringBefore("\t")?.trim() ?: ""
+    }
+
     fun createFakeBuiltArtifact() {
         createFakeBuiltArtifact("app")
     }

@@ -34,29 +34,34 @@ class BuildChangedProjectsAndCreateReleaseBranchesFunctionalTest : FunSpec({
     // No changed projects
     // ─────────────────────────────────────────────────────────────
 
-    test("succeeds with no branches created when no projects have changed") {
+    test("succeeds with no branches created and does not update tag when no projects have changed") {
         // given: tag at HEAD so no changes detected
         val project = StandardReleaseTestProject.createMultiProjectAndInitialize(testListener.getTestProjectDir())
         project.createTag("monorepo/last-successful-build")
+        project.pushTag("monorepo/last-successful-build")
+        val tagCommitBefore = project.commitForTag("monorepo/last-successful-build")
 
         // when
         val result = project.runTask("buildChangedProjectsAndCreateReleaseBranches")
 
-        // then
+        // then: tag not moved because there were no changes
         result.task(":buildChangedProjectsAndCreateReleaseBranches")?.outcome shouldBe TaskOutcome.SUCCESS
         project.remoteBranches().filter { it.startsWith("release/") } shouldBe emptyList()
+        project.commitForTag("monorepo/last-successful-build") shouldBe tagCommitBefore
     }
 
     // ─────────────────────────────────────────────────────────────
     // Single project changed
     // ─────────────────────────────────────────────────────────────
 
-    test("creates release branch only for the changed opted-in project") {
+    test("creates release branch and updates tag for the changed opted-in project") {
         // given
         val project = StandardReleaseTestProject.createMultiProjectAndInitialize(testListener.getTestProjectDir())
         project.createTag("monorepo/last-successful-build")
+        project.pushTag("monorepo/last-successful-build")
         project.modifyFile("app/app.txt", "changed")
         project.commitAll("Change app")
+        val headCommit = project.headCommit()
 
         // when
         val result = project.runTask("buildChangedProjectsAndCreateReleaseBranches")
@@ -65,6 +70,7 @@ class BuildChangedProjectsAndCreateReleaseBranchesFunctionalTest : FunSpec({
         result.task(":buildChangedProjectsAndCreateReleaseBranches")?.outcome shouldBe TaskOutcome.SUCCESS
         project.remoteBranches() shouldContain "release/app/v0.1.x"
         project.remoteBranches() shouldNotContain "release/lib/v0.1.x"
+        project.remoteTagCommit("monorepo/last-successful-build") shouldBe headCommit
     }
 
     // ─────────────────────────────────────────────────────────────
@@ -144,10 +150,12 @@ class BuildChangedProjectsAndCreateReleaseBranchesFunctionalTest : FunSpec({
     // Rollback on local branch collision
     // ─────────────────────────────────────────────────────────────
 
-    test("rolls back all local branches when one already exists locally") {
+    test("rolls back all local branches and does not update tag when one already exists locally") {
         // given: pre-create a local branch for app so creation fails
         val project = StandardReleaseTestProject.createMultiProjectAndInitialize(testListener.getTestProjectDir())
         project.createTag("monorepo/last-successful-build")
+        project.pushTag("monorepo/last-successful-build")
+        val tagCommitBefore = project.commitForTag("monorepo/last-successful-build")
         project.modifyFile("app/app.txt", "changed")
         project.modifyFile("lib/lib.txt", "changed")
         project.commitAll("Change both")
@@ -157,17 +165,18 @@ class BuildChangedProjectsAndCreateReleaseBranchesFunctionalTest : FunSpec({
         // when
         val result = project.runTaskAndFail("buildChangedProjectsAndCreateReleaseBranches")
 
-        // then: task fails; neither branch pushed to remote
+        // then: task fails; neither branch pushed; tag not updated
         result.output shouldContain "already exists locally"
         project.remoteBranches() shouldNotContain "release/app/v0.1.x"
         project.remoteBranches() shouldNotContain "release/lib/v0.1.x"
+        project.remoteTagCommit("monorepo/last-successful-build") shouldBe tagCommitBefore
     }
 
     // ─────────────────────────────────────────────────────────────
     // All disabled
     // ─────────────────────────────────────────────────────────────
 
-    test("no release branches created when all changed projects have release disabled") {
+    test("updates tag but creates no branches when all changed projects have release disabled") {
         // given: both disabled
         val project = StandardReleaseTestProject.createMultiProjectAndInitialize(
             testListener.getTestProjectDir(),
@@ -194,16 +203,19 @@ class BuildChangedProjectsAndCreateReleaseBranchesFunctionalTest : FunSpec({
         )
         project.commitAll("Disable app release")
         project.createTag("monorepo/last-successful-build")
+        project.pushTag("monorepo/last-successful-build")
         project.modifyFile("app/app.txt", "changed")
         project.modifyFile("lib/lib.txt", "changed")
         project.commitAll("Change both")
+        val headCommit = project.headCommit()
 
         // when
         val result = project.runTask("buildChangedProjectsAndCreateReleaseBranches")
 
-        // then
+        // then: tag still updated even though no release branches were created
         result.task(":buildChangedProjectsAndCreateReleaseBranches")?.outcome shouldBe TaskOutcome.SUCCESS
         result.output shouldContain "no release branches to create"
         project.remoteBranches().filter { it.startsWith("release/") } shouldBe emptyList()
+        project.remoteTagCommit("monorepo/last-successful-build") shouldBe headCommit
     }
 })
