@@ -110,4 +110,14 @@ class TagPatternTest : FunSpec({
             exception.message shouldContain branch
         }
     }
+
+    context("parseProjectPrefixFromBranch extracts the project prefix") {
+        withData(
+            Triple("release/app/v0.1.x", "release", "app"),
+            Triple("release/services-auth/v1.2.x", "release", "services-auth"),
+            Triple("deploy/my-app/v0.3.x", "deploy", "my-app"),
+        ) { (branch, globalPrefix, expectedPrefix) ->
+            TagPattern.parseProjectPrefixFromBranch(branch, globalPrefix) shouldBe expectedPrefix
+        }
+    }
 })

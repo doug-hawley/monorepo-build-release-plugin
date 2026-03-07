@@ -35,4 +35,10 @@ object TagPattern {
             )
         return Pair(match.groupValues[1].toInt(), match.groupValues[2].toInt())
     }
+
+    fun parseProjectPrefixFromBranch(branch: String, globalPrefix: String): String {
+        // Expected format: <globalPrefix>/<projectPrefix>/v<major>.<minor>.x
+        val withoutGlobal = branch.removePrefix("$globalPrefix/")
+        return withoutGlobal.substringBeforeLast("/")
+    }
 }

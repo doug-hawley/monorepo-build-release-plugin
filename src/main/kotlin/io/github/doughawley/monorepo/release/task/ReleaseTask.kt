@@ -4,7 +4,6 @@ import io.github.doughawley.monorepo.release.MonorepoReleaseConfigExtension
 import io.github.doughawley.monorepo.release.MonorepoReleaseExtension
 import io.github.doughawley.monorepo.release.domain.NextVersionResolver
 import io.github.doughawley.monorepo.release.domain.Scope
-import io.github.doughawley.monorepo.release.domain.SemanticVersion
 import io.github.doughawley.monorepo.release.domain.TagPattern
 import io.github.doughawley.monorepo.release.git.GitReleaseExecutor
 import io.github.doughawley.monorepo.release.git.GitTagScanner
@@ -45,7 +44,7 @@ open class ReleaseTask : DefaultTask() {
             )
         }
 
-        // 3. Branch validation
+        // 3. Branch validation — must be on a release branch
         val globalPrefix = rootExtension.globalTagPrefix
         val currentBranch = gitReleaseExecutor.currentBranch()
         if (currentBranch == "HEAD") {
@@ -54,36 +53,36 @@ open class ReleaseTask : DefaultTask() {
                 "Check out a branch before releasing."
             )
         }
-        val isReleaseBranch = TagPattern.isReleaseBranch(currentBranch, globalPrefix)
-        val isAllowedBranch = isReleaseBranch || rootExtension.releaseBranchPatterns.any { pattern ->
-            currentBranch.matches(Regex(pattern))
-        }
-        if (!isAllowedBranch) {
+        if (!TagPattern.isReleaseBranch(currentBranch, globalPrefix)) {
             throw GradleException(
                 "Cannot release from branch '$currentBranch'. " +
-                "Releases must be made from a configured release branch. " +
-                "Allowed patterns: ${rootExtension.releaseBranchPatterns.joinToString(", ")}"
+                "Releases must be made from a release branch " +
+                "(e.g., $globalPrefix/<project>/v<major>.<minor>.x)."
             )
         }
 
-        // 4. Scope resolution
-        val scope = resolveScope(isReleaseBranch)
-
-        // 5. Determine tag prefix
+        // 4. Determine tag prefix
         val projectPrefix = projectConfig.tagPrefix
             ?: TagPattern.deriveProjectTagPrefix(project.path)
 
-        // 6. Scan tags to find next version
-        val nextVersion = if (isReleaseBranch) {
-            val (major, minor) = TagPattern.parseVersionLineFromBranch(currentBranch)
-            val latestInLine = gitTagScanner.findLatestVersionInLine(globalPrefix, projectPrefix, major, minor)
-            NextVersionResolver.forReleaseBranch(latestInLine, major, minor, scope)
-        } else {
-            val latestVersion = gitTagScanner.findLatestVersion(globalPrefix, projectPrefix)
-            NextVersionResolver.forPrimaryBranch(latestVersion, scope)
+        // 5. Branch-to-project validation
+        val branchProjectPrefix = TagPattern.parseProjectPrefixFromBranch(currentBranch, globalPrefix)
+        if (branchProjectPrefix != projectPrefix) {
+            throw GradleException(
+                "Cannot release ${project.path} from branch '$currentBranch'. " +
+                "This branch is for project '$branchProjectPrefix', not '$projectPrefix'."
+            )
         }
 
-        // 7. Tag collision check
+        // 6. Scope validation
+        val scope = resolveScope()
+
+        // 7. Scan tags to find next version
+        val (major, minor) = TagPattern.parseVersionLineFromBranch(currentBranch)
+        val latestInLine = gitTagScanner.findLatestVersionInLine(globalPrefix, projectPrefix, major, minor)
+        val nextVersion = NextVersionResolver.forReleaseBranch(latestInLine, major, minor, scope)
+
+        // 8. Tag collision check
         val tag = TagPattern.formatTag(globalPrefix, projectPrefix, nextVersion)
         if (gitTagScanner.tagExists(tag)) {
             throw GradleException(
@@ -92,7 +91,7 @@ open class ReleaseTask : DefaultTask() {
             )
         }
 
-        // 8. Build outputs check
+        // 9. Build outputs check
         val libsDir = project.layout.buildDirectory.dir("libs").get().asFile
         val libsFiles = libsDir.listFiles()
         if (!libsDir.exists() || libsFiles == null || libsFiles.isEmpty()) {
@@ -101,26 +100,12 @@ open class ReleaseTask : DefaultTask() {
             )
         }
 
-        // 9. Set project.version
+        // 10. Set project.version
         project.version = nextVersion.toString()
         logger.lifecycle("Releasing ${project.path} as version $nextVersion")
 
-        // 10. Create tag locally
+        // 11. Create tag locally
         gitReleaseExecutor.createTagLocally(tag)
-
-        // 11. Create release branch locally (only when not on a release branch)
-        val releaseBranch: String? = if (!isReleaseBranch) {
-            val branch = TagPattern.formatReleaseBranch(globalPrefix, projectPrefix, nextVersion)
-            try {
-                gitReleaseExecutor.createBranchLocally(branch)
-            } catch (e: GradleException) {
-                gitReleaseExecutor.deleteLocalTag(tag)
-                throw e
-            }
-            branch
-        } else {
-            null
-        }
 
         // 12. Push to remote (with rollback on failure)
         try {
@@ -128,23 +113,7 @@ open class ReleaseTask : DefaultTask() {
         } catch (e: GradleException) {
             logger.error("Push failed, rolling back local changes: ${e.message}")
             gitReleaseExecutor.deleteLocalTag(tag)
-            if (releaseBranch != null) {
-                gitReleaseExecutor.deleteLocalBranch(releaseBranch)
-            }
             throw e
-        }
-        if (releaseBranch != null) {
-            try {
-                gitReleaseExecutor.pushBranch(releaseBranch)
-            } catch (e: GradleException) {
-                gitReleaseExecutor.deleteLocalTag(tag)
-                gitReleaseExecutor.deleteLocalBranch(releaseBranch)
-                logger.error(
-                    "Branch push failed. Tag '$tag' was already pushed to remote — " +
-                    "it cannot be rolled back automatically."
-                )
-                throw e
-            }
         }
 
         // 13. Write build/release-version.txt
@@ -154,25 +123,7 @@ open class ReleaseTask : DefaultTask() {
         logger.lifecycle("Wrote release version to: ${versionFile.absolutePath}")
     }
 
-    private fun resolveScope(isReleaseBranch: Boolean): Scope {
-        if (isReleaseBranch) {
-            val scopeProperty = project.findProperty("release.scope") as? String
-            if (scopeProperty != null) {
-                val parsed = Scope.fromString(scopeProperty)
-                    ?: throw GradleException(
-                        "Invalid release.scope value: '$scopeProperty'. " +
-                        "Must be one of: major, minor, patch"
-                    )
-                if (parsed != Scope.PATCH) {
-                    throw GradleException(
-                        "Cannot use scope '$scopeProperty' on a release branch. " +
-                        "Patch releases only — remove the -Prelease.scope flag or use 'patch'."
-                    )
-                }
-            }
-            return Scope.PATCH
-        }
-
+    private fun resolveScope(): Scope {
         val scopeProperty = project.findProperty("release.scope") as? String
         if (scopeProperty != null) {
             val parsed = Scope.fromString(scopeProperty)
@@ -180,28 +131,14 @@ open class ReleaseTask : DefaultTask() {
                     "Invalid release.scope value: '$scopeProperty'. " +
                     "Must be one of: major, minor, patch"
                 )
-            if (parsed == Scope.PATCH) {
+            if (parsed != Scope.PATCH) {
                 throw GradleException(
-                    "Cannot use scope 'patch' on the main branch. " +
-                    "Use 'minor' or 'major' for new feature releases."
+                    "Cannot use scope '$scopeProperty' on a release branch. " +
+                    "Patch releases only — remove the -Prelease.scope flag or use 'patch'."
                 )
             }
-            return parsed
         }
-
-        val dslScope = Scope.fromString(rootExtension.primaryBranchScope)
-            ?: throw GradleException(
-                "Invalid primaryBranchScope in monorepo { release { } } DSL: " +
-                "'${rootExtension.primaryBranchScope}'. " +
-                "Must be one of: major, minor"
-            )
-        if (dslScope == Scope.PATCH) {
-            throw GradleException(
-                "Cannot configure primaryBranchScope as 'patch' on the main branch. " +
-                "Use 'minor' or 'major'."
-            )
-        }
-        return dslScope
+        return Scope.PATCH
     }
 
 }

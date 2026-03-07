@@ -7,20 +7,6 @@ package io.github.doughawley.monorepo.release.domain
 object NextVersionResolver {
 
     /**
-     * Resolves the next version for a release from the primary branch (e.g., main).
-     *
-     * @param latestVersion the highest existing version across all version lines, or null if no tags exist
-     * @param scope the bump scope (MINOR or MAJOR)
-     */
-    fun forPrimaryBranch(latestVersion: SemanticVersion?, scope: Scope): SemanticVersion {
-        return if (latestVersion == null) {
-            SemanticVersion(0, 1, 0)
-        } else {
-            latestVersion.bump(scope)
-        }
-    }
-
-    /**
      * Resolves the next version for a patch release from a release branch.
      *
      * @param latestInLine the highest existing version within this version line, or null if no tags exist for it

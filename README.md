@@ -148,21 +148,19 @@ Builds all opted-in projects that changed since the configured commit ref, then 
 
 #### `:subproject:release`
 
-Releases a single subproject manually, regardless of whether it changed:
+Releases a single subproject from its release branch. Must be run from a matching release branch (e.g., `:app1:release` must be run from `release/app1/v0.1.x`):
 
 ```bash
-# Release using the default scope
 ./gradlew :api:release
-
-# Override the version bump scope (primary branch only)
-./gradlew :api:release -Prelease.scope=major
 ```
+
+The task will fail if run from `main`, a feature branch, or a release branch belonging to a different project.
 
 #### Versioning rules
 
-- First release of a project starts at `0.1.0`
-- Releases from the primary branch bump using `primaryBranchScope` (default `minor`)
-- Releases from a release branch (`release/api/v1.2.x`) always apply a `patch` bump
+- Release branches follow the pattern `{globalTagPrefix}/{projectPrefix}/v{major}.{minor}.x`
+- The first release on a new branch (e.g., `release/api/v0.1.x`) creates `v0.1.0`
+- Subsequent releases on that branch apply a `patch` bump (`v0.1.1`, `v0.1.2`, …)
 - The subproject must be built before releasing — `release` requires `build` to have run
 
 ### Advanced
@@ -295,7 +293,7 @@ Applied per subproject. Patterns are matched against paths **relative to the sub
 |----------|------|---------|-------------|
 | `globalTagPrefix` | String | `"release"` | Prefix used in all tag and release branch names |
 | `primaryBranchScope` | String | `"minor"` | Version bump scope when releasing from the primary branch; `"minor"` or `"major"` |
-| `releaseBranchPatterns` | List\<String\> | `["^main$", "^release/.*"]` | Regex patterns for branches from which releases are permitted |
+| `releaseBranchPatterns` | List\<String\> | `["^main$", "^release/.*"]` | Regex patterns for branches from which `createReleaseBranchesForChangedProjects` is permitted to run |
 
 ### `monorepoProject { release { } }`
 
