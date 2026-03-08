@@ -35,6 +35,7 @@ object StandardTestProject {
         if (withRemote) {
             project.pushToRemote()
         }
+        project.executeGitCommand("tag", "monorepo/last-successful-build")
         return project
     }
 

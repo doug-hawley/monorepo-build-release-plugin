@@ -204,9 +204,10 @@ class MonorepoBuildReleasePlugin @Inject constructor(
 
     /**
      * Resolves the base ref for change detection.
-     * Uses the last-successful-build tag if it exists, otherwise falls back to origin/<primaryBranch>.
+     * Returns the last-successful-build tag if it exists, or null when no baseline exists
+     * (which causes all tracked files to be treated as changed).
      */
-    private fun resolveBaseRef(project: Project, rootExtension: MonorepoExtension): String {
+    private fun resolveBaseRef(project: Project, rootExtension: MonorepoExtension): String? {
         val buildExtension = rootExtension.build
         val gitRepository = GitRepository(project.rootDir, project.logger)
         val tag = buildExtension.lastSuccessfulBuildTag
@@ -216,9 +217,11 @@ class MonorepoBuildReleasePlugin @Inject constructor(
             return tag
         }
 
-        val fallback = "origin/${rootExtension.primaryBranch}"
-        project.logger.info("Tag '$tag' not found, falling back to '$fallback'")
-        return fallback
+        project.logger.lifecycle(
+            "Tag '$tag' not found — no baseline exists. " +
+            "All projects will be treated as changed."
+        )
+        return null
     }
 
     /**
@@ -247,7 +250,7 @@ class MonorepoBuildReleasePlugin @Inject constructor(
      * Computes changed project metadata.
      * Called during the configuration phase to ensure all dependencies are fully resolved.
      */
-    internal fun computeMetadata(project: Project, extension: MonorepoBuildExtension, resolvedBaseRef: String) {
+    internal fun computeMetadata(project: Project, extension: MonorepoBuildExtension, resolvedBaseRef: String?) {
         val logger = project.logger
 
         logger.info("Computing changed project metadata...")

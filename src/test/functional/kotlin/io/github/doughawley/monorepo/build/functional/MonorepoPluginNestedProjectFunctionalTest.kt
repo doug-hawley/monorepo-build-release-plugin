@@ -24,6 +24,7 @@ class MonorepoPluginNestedProjectFunctionalTest : FunSpec({
             project.initGit()
             project.commitAll("Initial commit")
             project.pushToRemote()
+            project.executeGitCommand("tag", "monorepo/last-successful-build")
         }
 
     test("plugin detects change in three-level-deep project") {

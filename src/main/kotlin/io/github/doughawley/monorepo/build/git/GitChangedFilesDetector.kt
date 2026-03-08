@@ -15,21 +15,24 @@ class GitChangedFilesDetector(
     /**
      * Gets the set of changed files by comparing HEAD against a resolved base ref.
      *
-     * Always includes:
+     * When [resolvedBaseRef] is non-null:
      * - Files changed between [resolvedBaseRef] and HEAD (two-dot diff)
+     *
+     * When [resolvedBaseRef] is null (no baseline exists):
+     * - All tracked files are treated as changed
      *
      * When [includeUntracked] is true, also includes:
      * - Files modified in the working tree (unstaged)
      * - Files staged in the git index
      * - Untracked files not covered by .gitignore
      *
-     * @param resolvedBaseRef The git ref to diff against HEAD (tag, branch, or SHA)
+     * @param resolvedBaseRef The git ref to diff against HEAD, or null to treat all files as changed
      * @param includeUntracked Whether to include working-tree, staged, and untracked files
      * @param excludePatterns Regex patterns for files to exclude from results
      * @return Set of changed file paths relative to the repository root
      */
     fun getChangedFiles(
-        resolvedBaseRef: String,
+        resolvedBaseRef: String?,
         includeUntracked: Boolean,
         excludePatterns: List<String>
     ): Set<String> {
@@ -40,9 +43,15 @@ class GitChangedFilesDetector(
 
         val changedFiles = mutableSetOf<String>()
 
-        val refChanges = gitRepository.diffFromRef(resolvedBaseRef)
-        logger.debug("Files from ref comparison: ${refChanges.size}")
-        changedFiles.addAll(refChanges)
+        if (resolvedBaseRef == null) {
+            val allFiles = gitRepository.allTrackedFiles()
+            logger.debug("No baseline — treating all ${allFiles.size} tracked files as changed")
+            changedFiles.addAll(allFiles)
+        } else {
+            val refChanges = gitRepository.diffFromRef(resolvedBaseRef)
+            logger.debug("Files from ref comparison: ${refChanges.size}")
+            changedFiles.addAll(refChanges)
+        }
 
         if (includeUntracked) {
             val workingTreeChanges = gitRepository.workingTreeChanges()

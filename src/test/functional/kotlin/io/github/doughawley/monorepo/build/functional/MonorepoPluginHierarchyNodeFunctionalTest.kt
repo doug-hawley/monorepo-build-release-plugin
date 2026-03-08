@@ -97,6 +97,7 @@ class MonorepoPluginHierarchyNodeFunctionalTest : FunSpec({
         project.initGit()
         project.commitAll("Initial commit")
         project.pushToRemote()
+        project.executeGitCommand("tag", "monorepo/last-successful-build")
 
         // when
         project.appendToFile(

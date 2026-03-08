@@ -51,21 +51,6 @@ class BuildChangedProjectsAndCreateReleaseBranchesFunctionalTest : FunSpec({
         project.remoteTagCommit("monorepo/last-successful-build") shouldBe headCommit
     }
 
-    test("creates tag on first run when no tag exists and no changes since origin/main") {
-        // given: no tag exists, HEAD is at origin/main — simulates first CI run
-        val project = StandardReleaseTestProject.createMultiProjectAndInitialize(testListener.getTestProjectDir())
-        val headCommit = project.headCommit()
-
-        // when
-        val result = project.runTask("buildChangedProjectsAndCreateReleaseBranches")
-
-        // then: tag bootstrapped so future runs have a baseline
-        result.task(":buildChangedProjectsAndCreateReleaseBranches")?.outcome shouldBe TaskOutcome.SUCCESS
-        result.output shouldContain "No projects have changed"
-        project.remoteBranches().filter { it.startsWith("release/") } shouldBe emptyList()
-        project.remoteTagCommit("monorepo/last-successful-build") shouldBe headCommit
-    }
-
     // ─────────────────────────────────────────────────────────────
     // Single project changed
     // ─────────────────────────────────────────────────────────────
@@ -228,21 +213,21 @@ class BuildChangedProjectsAndCreateReleaseBranchesFunctionalTest : FunSpec({
     }
 
     // ─────────────────────────────────────────────────────────────
-    // Fallback to origin/main when tag does not exist
+    // No baseline (tag does not exist)
     // ─────────────────────────────────────────────────────────────
 
-    test("falls back to origin/main when last-successful-build tag does not exist") {
-        // given: no tag, so plugin should fallback to origin/main
+    test("creates release branches for all opted-in projects when tag does not exist") {
+        // given: no tag — all projects treated as changed
         val project = StandardReleaseTestProject.createMultiProjectAndInitialize(testListener.getTestProjectDir())
-        project.modifyFile("app/app.txt", "changed")
-        project.commitAll("Change app")
 
         // when
         val result = project.runTask("buildChangedProjectsAndCreateReleaseBranches")
 
-        // then: should detect changes and create release branch
+        // then: both opted-in projects get release branches
         result.task(":buildChangedProjectsAndCreateReleaseBranches")?.outcome shouldBe TaskOutcome.SUCCESS
+        result.output shouldContain "no baseline"
         project.remoteBranches() shouldContain "release/app/v0.1.x"
+        project.remoteBranches() shouldContain "release/lib/v0.1.x"
     }
 
     // ─────────────────────────────────────────────────────────────

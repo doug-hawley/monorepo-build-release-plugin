@@ -227,10 +227,6 @@ class PrintChangedProjectsFunctionalTest : FunSpec({
             testProjectListener.getTestProjectDir(),
             withRemote = false
         )
-        val initialSha = project.getLastCommitSha()
-
-        // Create a tag at the initial commit to simulate last-successful-build
-        project.executeGitCommand("tag", "monorepo/last-successful-build", initialSha)
 
         // Make a change to common-lib and commit
         project.appendToFile(Files.COMMON_LIB_SOURCE, "\n// Modified")
@@ -251,8 +247,6 @@ class PrintChangedProjectsFunctionalTest : FunSpec({
             testProjectListener.getTestProjectDir(),
             withRemote = false
         )
-        val initialSha = project.getLastCommitSha()
-        project.executeGitCommand("tag", "monorepo/last-successful-build", initialSha)
 
         project.appendToFile(Files.COMMON_LIB_SOURCE, "\n// Modified")
         project.commitAll("Modify common-lib")
@@ -283,8 +277,8 @@ class PrintChangedProjectsFunctionalTest : FunSpec({
         project.appendToFile(Files.COMMON_LIB_SOURCE, "\n// First change")
         project.commitAll("Modify common-lib")
 
-        // Tag after first change — simulates successful build
-        project.executeGitCommand("tag", "monorepo/last-successful-build")
+        // Move tag to after first change — simulates successful build
+        project.executeGitCommand("tag", "-f", "monorepo/last-successful-build")
 
         // Change only module1 in a second commit
         project.appendToFile(Files.MODULE1_SOURCE, "\n// Second change")

@@ -77,6 +77,12 @@ open class GitRepository(
         return gitExecutor.executeForOutput(dir, "ls-files", "--others", "--exclude-standard")
     }
 
+    /** Returns all tracked files in the repository. */
+    open fun allTrackedFiles(): List<String> {
+        val dir = gitDir ?: return emptyList()
+        return gitExecutor.executeForOutput(dir, "ls-files")
+    }
+
     /** Returns true if [ref] resolves to an existing object in this repository. */
     open fun refExists(ref: String): Boolean {
         val dir = gitDir ?: return false

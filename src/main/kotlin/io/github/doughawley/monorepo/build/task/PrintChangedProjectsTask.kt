@@ -32,8 +32,13 @@ abstract class PrintChangedProjectsTask : DefaultTask() {
         }
 
         val resolvedRef = extension.resolvedBaseRef
+        val header = if (resolvedRef != null) {
+            "Changed projects (since $resolvedRef):"
+        } else {
+            "Changed projects (no baseline — all projects):"
+        }
         logger.lifecycle(ChangedProjectsPrinter().buildReport(
-            header = "Changed projects (since $resolvedRef):",
+            header = header,
             monorepoProjects = extension.monorepoProjects
         ))
     }
