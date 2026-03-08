@@ -91,6 +91,7 @@ val integrationTest by tasks.registering(Test::class) {
     useJUnitPlatform()
     outputs.upToDateWhen { false }
     shouldRunAfter(unitTest)
+    maxParallelForks = Runtime.getRuntime().availableProcessors().coerceAtLeast(1)
 }
 
 // Register functional test task
@@ -102,7 +103,7 @@ val functionalTest by tasks.registering(Test::class) {
     useJUnitPlatform()
     outputs.upToDateWhen { false }
     shouldRunAfter(unitTest, integrationTest)
-    maxParallelForks = (Runtime.getRuntime().availableProcessors() / 2).coerceAtLeast(1)
+    maxParallelForks = Runtime.getRuntime().availableProcessors().coerceAtLeast(1)
 }
 
 // Make check depend on all test types

@@ -70,13 +70,18 @@ object StandardReleaseTestProject {
 
         File(appDir, "build.gradle.kts").writeText(
             """
-            plugins {
-                kotlin("jvm") version "2.0.21"
-            }
-
             monorepoProject {
                 release {
                     enabled = true
+                }
+            }
+
+            // Lightweight fake build task: creates the expected artifact so release can proceed
+            tasks.register("build") {
+                doLast {
+                    val libsDir = layout.buildDirectory.dir("libs").get().asFile
+                    libsDir.mkdirs()
+                    java.io.File(libsDir, "${'$'}{project.name}.jar").writeText("built artifact")
                 }
             }
             """.trimIndent()

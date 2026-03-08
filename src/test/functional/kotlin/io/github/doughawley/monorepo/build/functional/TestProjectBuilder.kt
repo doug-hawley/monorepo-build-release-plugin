@@ -101,7 +101,7 @@ class TestProjectBuilder(private val projectDir: File) {
                 if (subproject.isBom) {
                     appendLine("    `java-platform`")
                 } else {
-                    appendLine("    kotlin(\"jvm\") version \"2.0.21\"")
+                    appendLine("    java")
                 }
                 appendLine("}")
                 appendLine()
@@ -113,7 +113,7 @@ class TestProjectBuilder(private val projectDir: File) {
                         // First dependency is the platform
                         val platformDep = subproject.dependencies.first()
                         val platformPath = platformDep.replace("/", ":")
-                        appendLine("    api(platform(project(\":$platformPath\")))")
+                        appendLine("    implementation(platform(project(\":$platformPath\")))")
 
                         // Rest are regular dependencies
                         subproject.dependencies.drop(1).forEach { dep ->
