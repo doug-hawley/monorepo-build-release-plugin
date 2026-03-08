@@ -13,7 +13,7 @@ import org.gradle.testkit.runner.TaskOutcome
  * do not appear in changed or affected project results.
  */
 class MonorepoPluginHierarchyNodeFunctionalTest : FunSpec({
-    val testProjectListener = listener(TestProjectListener())
+    val testProjectListener = extension(TestProjectListener())
 
     test("hierarchy node does not appear in directly changed projects when child file changes") {
         // given

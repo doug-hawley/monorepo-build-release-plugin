@@ -10,7 +10,7 @@ import io.kotest.matchers.shouldBe
  * Functional tests for three-level-deep project hierarchies (e.g. :services:billing:api).
  */
 class MonorepoPluginNestedProjectFunctionalTest : FunSpec({
-    val testProjectListener = listener(TestProjectListener())
+    val testProjectListener = extension(TestProjectListener())
 
     fun createNestedProject() = TestProjectBuilder(testProjectListener.getTestProjectDir())
         .withSubproject("services/billing/api")

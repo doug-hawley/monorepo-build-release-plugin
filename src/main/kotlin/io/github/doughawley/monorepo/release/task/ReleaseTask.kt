@@ -11,7 +11,9 @@ import org.gradle.api.DefaultTask
 import org.gradle.api.GradleException
 import org.gradle.api.tasks.Internal
 import org.gradle.api.tasks.TaskAction
+import org.gradle.work.DisableCachingByDefault
 
+@DisableCachingByDefault(because = "Creates git tags and pushes to remote")
 open class ReleaseTask : DefaultTask() {
 
     @get:Internal

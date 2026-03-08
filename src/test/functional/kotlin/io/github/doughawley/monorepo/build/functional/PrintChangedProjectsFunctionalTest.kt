@@ -15,7 +15,7 @@ import org.gradle.testkit.runner.TaskOutcome
  * Functional tests for the printChangedProjects task.
  */
 class PrintChangedProjectsFunctionalTest : FunSpec({
-    val testProjectListener = listener(TestProjectListener())
+    val testProjectListener = extension(TestProjectListener())
 
     // --- Detection scenarios (formerly branch-mode) ---
 

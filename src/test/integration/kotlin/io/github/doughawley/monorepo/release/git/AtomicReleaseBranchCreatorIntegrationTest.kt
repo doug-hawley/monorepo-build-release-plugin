@@ -16,7 +16,7 @@ import org.gradle.api.logging.Logger
 class AtomicReleaseBranchCreatorIntegrationTest : FunSpec({
 
     val repoListener = TempGitRepoListener()
-    listener(repoListener)
+    extension(repoListener)
 
     val logger = mockk<Logger>(relaxed = true)
 

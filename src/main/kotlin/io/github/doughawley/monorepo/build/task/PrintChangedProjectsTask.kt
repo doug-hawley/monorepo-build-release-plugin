@@ -5,6 +5,7 @@ import io.github.doughawley.monorepo.MonorepoExtension
 import org.gradle.api.DefaultTask
 import org.gradle.api.GradleException
 import org.gradle.api.tasks.TaskAction
+import org.gradle.work.DisableCachingByDefault
 
 /**
  * Task that prints which projects have changed based on git history and dependency analysis.
@@ -14,6 +15,7 @@ import org.gradle.api.tasks.TaskAction
  *   - Transitively affected projects are listed with an "(affected via ...)" annotation naming
  *     the direct dependencies that carry the change.
  */
+@DisableCachingByDefault(because = "Prints git-based change detection results")
 abstract class PrintChangedProjectsTask : DefaultTask() {
 
     @TaskAction

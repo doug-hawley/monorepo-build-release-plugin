@@ -11,7 +11,7 @@ import java.io.File
 
 class ReleaseTaskFunctionalTest : FunSpec({
 
-    val testListener = listener(ReleaseTestProjectListener())
+    val testListener = extension(ReleaseTestProjectListener())
 
     // ─────────────────────────────────────────────────────────────
     // Core versioning

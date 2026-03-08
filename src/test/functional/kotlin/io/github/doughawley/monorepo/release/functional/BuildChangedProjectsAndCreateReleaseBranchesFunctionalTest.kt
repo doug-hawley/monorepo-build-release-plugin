@@ -9,7 +9,7 @@ import org.gradle.testkit.runner.TaskOutcome
 
 class BuildChangedProjectsAndCreateReleaseBranchesFunctionalTest : FunSpec({
 
-    val testListener = listener(ReleaseTestProjectListener())
+    val testListener = extension(ReleaseTestProjectListener())
 
     // ─────────────────────────────────────────────────────────────
     // Branch guard

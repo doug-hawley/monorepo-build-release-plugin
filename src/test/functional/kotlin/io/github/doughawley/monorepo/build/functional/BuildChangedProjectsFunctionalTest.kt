@@ -15,7 +15,7 @@ import org.gradle.testkit.runner.TaskOutcome
  * Functional tests for the buildChangedProjects task.
  */
 class BuildChangedProjectsFunctionalTest : FunSpec({
-    val testProjectListener = listener(TestProjectListener())
+    val testProjectListener = extension(TestProjectListener())
 
     test("buildChangedProjects task builds only affected projects") {
         // given

@@ -11,7 +11,7 @@ import org.gradle.testkit.runner.TaskOutcome
  * Functional tests for plugin configuration options.
  */
 class MonorepoPluginConfigurationTest : FunSpec({
-    val testProjectListener = listener(TestProjectListener())
+    val testProjectListener = extension(TestProjectListener())
 
     test("per-project exclude patterns prevent project from being marked changed") {
         // given: :api excludes generated files; :core has no excludes
