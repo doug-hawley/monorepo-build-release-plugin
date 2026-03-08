@@ -34,20 +34,36 @@ class BuildChangedProjectsAndCreateReleaseBranchesFunctionalTest : FunSpec({
     // No changed projects
     // ─────────────────────────────────────────────────────────────
 
-    test("succeeds with no branches created and does not update tag when no projects have changed") {
+    test("succeeds with no branches created and updates tag when no projects have changed") {
         // given: tag at HEAD so no changes detected
         val project = StandardReleaseTestProject.createMultiProjectAndInitialize(testListener.getTestProjectDir())
         project.createTag("monorepo/last-successful-build")
         project.pushTag("monorepo/last-successful-build")
-        val tagCommitBefore = project.commitForTag("monorepo/last-successful-build")
+        val headCommit = project.headCommit()
 
         // when
         val result = project.runTask("buildChangedProjectsAndCreateReleaseBranches")
 
-        // then: tag not moved because there were no changes
+        // then: tag still updated (idempotent) even when no changes detected
         result.task(":buildChangedProjectsAndCreateReleaseBranches")?.outcome shouldBe TaskOutcome.SUCCESS
+        result.output shouldContain "No projects have changed"
         project.remoteBranches().filter { it.startsWith("release/") } shouldBe emptyList()
-        project.commitForTag("monorepo/last-successful-build") shouldBe tagCommitBefore
+        project.remoteTagCommit("monorepo/last-successful-build") shouldBe headCommit
+    }
+
+    test("creates tag on first run when no tag exists and no changes since origin/main") {
+        // given: no tag exists, HEAD is at origin/main — simulates first CI run
+        val project = StandardReleaseTestProject.createMultiProjectAndInitialize(testListener.getTestProjectDir())
+        val headCommit = project.headCommit()
+
+        // when
+        val result = project.runTask("buildChangedProjectsAndCreateReleaseBranches")
+
+        // then: tag bootstrapped so future runs have a baseline
+        result.task(":buildChangedProjectsAndCreateReleaseBranches")?.outcome shouldBe TaskOutcome.SUCCESS
+        result.output shouldContain "No projects have changed"
+        project.remoteBranches().filter { it.startsWith("release/") } shouldBe emptyList()
+        project.remoteTagCommit("monorepo/last-successful-build") shouldBe headCommit
     }
 
     // ─────────────────────────────────────────────────────────────

@@ -167,6 +167,7 @@ class MonorepoBuildReleasePlugin @Inject constructor(
 
                 if (changedProjects.isEmpty()) {
                     project.logger.lifecycle("No projects have changed — nothing to do")
+                    tagUpdater.updateTag(buildExt.lastSuccessfulBuildTag)
                     return@doLast
                 }
 
