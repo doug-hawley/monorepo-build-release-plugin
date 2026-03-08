@@ -9,12 +9,13 @@ import io.github.doughawley.monorepo.release.git.GitReleaseExecutor
 import io.github.doughawley.monorepo.release.git.GitTagScanner
 import org.gradle.api.DefaultTask
 import org.gradle.api.GradleException
+import org.gradle.api.file.DirectoryProperty
 import org.gradle.api.tasks.Internal
 import org.gradle.api.tasks.TaskAction
 import org.gradle.work.DisableCachingByDefault
 
 @DisableCachingByDefault(because = "Creates git tags and pushes to remote")
-open class ReleaseTask : DefaultTask() {
+abstract class ReleaseTask : DefaultTask() {
 
     @get:Internal
     lateinit var rootExtension: MonorepoReleaseExtension
@@ -28,12 +29,21 @@ open class ReleaseTask : DefaultTask() {
     @get:Internal
     lateinit var gitReleaseExecutor: GitReleaseExecutor
 
+    @get:Internal
+    lateinit var projectPath: String
+
+    @get:Internal
+    abstract val buildDir: DirectoryProperty
+
+    @get:Internal
+    var releaseScopeProperty: String? = null
+
     @TaskAction
     fun release() {
         // 1. Opt-in check
         if (!projectConfig.enabled) {
             throw GradleException(
-                "Release is not enabled for ${project.path}. " +
+                "Release is not enabled for $projectPath. " +
                 "Set monorepoProject { release { enabled = true } } to opt in."
             )
         }
@@ -65,13 +75,13 @@ open class ReleaseTask : DefaultTask() {
 
         // 4. Determine tag prefix
         val projectPrefix = projectConfig.tagPrefix
-            ?: TagPattern.deriveProjectTagPrefix(project.path)
+            ?: TagPattern.deriveProjectTagPrefix(projectPath)
 
         // 5. Branch-to-project validation
         val branchProjectPrefix = TagPattern.parseProjectPrefixFromBranch(currentBranch, globalPrefix)
         if (branchProjectPrefix != projectPrefix) {
             throw GradleException(
-                "Cannot release ${project.path} from branch '$currentBranch'. " +
+                "Cannot release $projectPath from branch '$currentBranch'. " +
                 "This branch is for project '$branchProjectPrefix', not '$projectPrefix'."
             )
         }
@@ -94,17 +104,16 @@ open class ReleaseTask : DefaultTask() {
         }
 
         // 9. Build outputs check
-        val libsDir = project.layout.buildDirectory.dir("libs").get().asFile
+        val libsDir = buildDir.dir("libs").get().asFile
         val libsFiles = libsDir.listFiles()
         if (!libsDir.exists() || libsFiles == null || libsFiles.isEmpty()) {
             throw GradleException(
-                "Project must be built before releasing — run ${project.path}:build first."
+                "Project must be built before releasing — run $projectPath:build first."
             )
         }
 
-        // 10. Set project.version
-        project.version = nextVersion.toString()
-        logger.lifecycle("Releasing ${project.path} as version $nextVersion")
+        // 10. Release
+        logger.lifecycle("Releasing $projectPath as version $nextVersion")
 
         // 11. Create tag locally
         gitReleaseExecutor.createTagLocally(tag)
@@ -119,23 +128,23 @@ open class ReleaseTask : DefaultTask() {
         }
 
         // 13. Write build/release-version.txt
-        val versionFile = project.layout.buildDirectory.file("release-version.txt").get().asFile
+        val versionFile = buildDir.file("release-version.txt").get().asFile
         versionFile.parentFile.mkdirs()
         versionFile.writeText(nextVersion.toString())
         logger.lifecycle("Wrote release version to: ${versionFile.absolutePath}")
     }
 
     private fun resolveScope(): Scope {
-        val scopeProperty = project.findProperty("release.scope") as? String
-        if (scopeProperty != null) {
-            val parsed = Scope.fromString(scopeProperty)
+        val scopeValue = releaseScopeProperty
+        if (scopeValue != null) {
+            val parsed = Scope.fromString(scopeValue)
                 ?: throw GradleException(
-                    "Invalid release.scope value: '$scopeProperty'. " +
+                    "Invalid release.scope value: '$scopeValue'. " +
                     "Must be one of: major, minor, patch"
                 )
             if (parsed != Scope.PATCH) {
                 throw GradleException(
-                    "Cannot use scope '$scopeProperty' on a release branch. " +
+                    "Cannot use scope '$scopeValue' on a release branch. " +
                     "Patch releases only — remove the -Prelease.scope flag or use 'patch'."
                 )
             }

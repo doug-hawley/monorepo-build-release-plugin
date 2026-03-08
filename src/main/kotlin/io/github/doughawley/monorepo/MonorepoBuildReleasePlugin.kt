@@ -100,13 +100,14 @@ class MonorepoBuildReleasePlugin @Inject constructor(
         project.tasks.register("printChangedProjects", PrintChangedProjectsTask::class.java).configure {
             group = BUILD_TASK_GROUP
             description = "Detects which projects have changed based on git history"
+            buildExtension = rootBuildExtension
         }
 
         project.tasks.register("buildChangedProjects").configure {
             group = BUILD_TASK_GROUP
             description = "Builds only the projects that have been affected by changes"
+            val ext = rootBuildExtension
             doLast {
-                val ext = project.rootProject.extensions.getByType(MonorepoExtension::class.java).build
                 if (!ext.metadataComputed) {
                     throw IllegalStateException(
                         "Changed project metadata was not computed in the configuration phase. " +
@@ -117,9 +118,9 @@ class MonorepoBuildReleasePlugin @Inject constructor(
                 }
                 val changedProjects = ext.allAffectedProjects
                 if (changedProjects.isEmpty()) {
-                    project.logger.lifecycle("No projects have changed - nothing to build")
+                    logger.lifecycle("No projects have changed - nothing to build")
                 } else {
-                    project.logger.lifecycle("Building changed projects: ${changedProjects.joinToString(", ")}")
+                    logger.lifecycle("Building changed projects: ${changedProjects.joinToString(", ")}")
                 }
             }
         }
@@ -129,11 +130,12 @@ class MonorepoBuildReleasePlugin @Inject constructor(
         project.tasks.register("buildChangedProjectsAndCreateReleaseBranches").configure {
             group = RELEASE_TASK_GROUP
             description = "Builds changed projects and creates release branches atomically"
+            val buildExt = rootBuildExtension
+            val releaseExt = rootReleaseExtension
+            val ext = rootExtension
+            val rootDir = project.rootProject.rootDir
+            val rootProject = project.rootProject
             doLast {
-                val ext = project.rootProject.extensions.getByType(MonorepoExtension::class.java)
-                val buildExt = ext.build
-                val releaseExt = ext.release
-
                 if (!buildExt.metadataComputed) {
                     throw IllegalStateException(
                         "Changed project metadata was not computed in the configuration phase."
@@ -141,8 +143,8 @@ class MonorepoBuildReleasePlugin @Inject constructor(
                 }
 
                 // Branch guard: must be on primaryBranch
-                val executor = GitCommandExecutor(project.logger)
-                val releaseExecutor = GitReleaseExecutor(project.rootProject.rootDir, executor, project.logger)
+                val executor = GitCommandExecutor(logger)
+                val releaseExecutor = GitReleaseExecutor(rootDir, executor, logger)
                 val currentBranch = releaseExecutor.currentBranch()
                 if (currentBranch != ext.primaryBranch) {
                     throw GradleException(
@@ -154,7 +156,7 @@ class MonorepoBuildReleasePlugin @Inject constructor(
                 // Collect opted-in changed projects
                 val changedProjects = buildExt.allAffectedProjects
                 val optedInProjects = changedProjects.mapNotNull { projectPath ->
-                    val targetProject = project.rootProject.findProject(projectPath) ?: return@mapNotNull null
+                    val targetProject = rootProject.findProject(projectPath) ?: return@mapNotNull null
                     val projectExt = targetProject.extensions.findByType(MonorepoProjectExtension::class.java)
                         ?: return@mapNotNull null
                     if (!projectExt.release.enabled) return@mapNotNull null
@@ -163,16 +165,16 @@ class MonorepoBuildReleasePlugin @Inject constructor(
                     projectPath to tagPrefix
                 }.toMap()
 
-                val tagUpdater = LastSuccessfulBuildTagUpdater(project.rootProject.rootDir, executor, project.logger)
+                val tagUpdater = LastSuccessfulBuildTagUpdater(rootDir, executor, logger)
 
                 if (changedProjects.isEmpty()) {
-                    project.logger.lifecycle("No projects have changed — nothing to do")
+                    logger.lifecycle("No projects have changed — nothing to do")
                     tagUpdater.updateTag(buildExt.lastSuccessfulBuildTag)
                     return@doLast
                 }
 
                 if (optedInProjects.isEmpty()) {
-                    project.logger.lifecycle("No opted-in changed projects — no release branches to create")
+                    logger.lifecycle("No opted-in changed projects — no release branches to create")
                     tagUpdater.updateTag(buildExt.lastSuccessfulBuildTag)
                     return@doLast
                 }
@@ -190,8 +192,8 @@ class MonorepoBuildReleasePlugin @Inject constructor(
                 }
 
                 // Atomic branch creation
-                val tagScanner = GitTagScanner(project.rootProject.rootDir, executor)
-                val branchCreator = AtomicReleaseBranchCreator(releaseExecutor, tagScanner, project.logger)
+                val tagScanner = GitTagScanner(rootDir, executor)
+                val branchCreator = AtomicReleaseBranchCreator(releaseExecutor, tagScanner, logger)
                 branchCreator.createReleaseBranches(optedInProjects, releaseExt.globalTagPrefix, scope)
 
                 // Update last-successful-build tag
@@ -351,6 +353,9 @@ class MonorepoBuildReleasePlugin @Inject constructor(
             this.projectConfig = config
             this.gitTagScanner = scanner
             this.gitReleaseExecutor = releaseExecutor
+            this.projectPath = sub.path
+            this.buildDir.set(sub.layout.buildDirectory)
+            this.releaseScopeProperty = sub.findProperty("release.scope") as? String
             dependsOn("build")
             finalizedBy(postRelease)
         }

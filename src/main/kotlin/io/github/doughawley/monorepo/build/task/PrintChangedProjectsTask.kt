@@ -1,9 +1,10 @@
 package io.github.doughawley.monorepo.build.task
 
 import io.github.doughawley.monorepo.build.ChangedProjectsPrinter
-import io.github.doughawley.monorepo.MonorepoExtension
+import io.github.doughawley.monorepo.build.MonorepoBuildExtension
 import org.gradle.api.DefaultTask
 import org.gradle.api.GradleException
+import org.gradle.api.tasks.Internal
 import org.gradle.api.tasks.TaskAction
 import org.gradle.work.DisableCachingByDefault
 
@@ -18,11 +19,12 @@ import org.gradle.work.DisableCachingByDefault
 @DisableCachingByDefault(because = "Prints git-based change detection results")
 abstract class PrintChangedProjectsTask : DefaultTask() {
 
+    @get:Internal
+    lateinit var buildExtension: MonorepoBuildExtension
+
     @TaskAction
     fun detectChanges() {
-        val extension = project.rootProject.extensions.getByType(MonorepoExtension::class.java).build
-
-        if (!extension.metadataComputed) {
+        if (!buildExtension.metadataComputed) {
             throw GradleException(
                 "Changed project metadata was not computed in the configuration phase. " +
                 "Possible causes: the plugin was not applied to the root project, " +
@@ -31,7 +33,7 @@ abstract class PrintChangedProjectsTask : DefaultTask() {
             )
         }
 
-        val resolvedRef = extension.resolvedBaseRef
+        val resolvedRef = buildExtension.resolvedBaseRef
         val header = if (resolvedRef != null) {
             "Changed projects (since $resolvedRef):"
         } else {
@@ -39,7 +41,7 @@ abstract class PrintChangedProjectsTask : DefaultTask() {
         }
         logger.lifecycle(ChangedProjectsPrinter().buildReport(
             header = header,
-            monorepoProjects = extension.monorepoProjects
+            monorepoProjects = buildExtension.monorepoProjects
         ))
     }
 }
