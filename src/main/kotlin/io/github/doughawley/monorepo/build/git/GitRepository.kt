@@ -23,15 +23,6 @@ open class GitRepository(
     open fun isRepository(): Boolean = gitDir != null
 
     /**
-     * Three-dot diff against a resolved base ref.
-     * Returns files changed between the merge-base of [resolvedRef] and HEAD.
-     */
-    open fun diffBranch(resolvedRef: String): List<String> {
-        val dir = gitDir ?: return emptyList()
-        return gitExecutor.executeForOutput(dir, "diff", "--name-only", "$resolvedRef...HEAD")
-    }
-
-    /**
      * Two-dot diff against a specific commit ref.
      * Returns files changed between [commitRef] and HEAD.
      *

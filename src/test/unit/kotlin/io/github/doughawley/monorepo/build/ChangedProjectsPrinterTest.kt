@@ -93,6 +93,36 @@ class ChangedProjectsPrinterTest : FunSpec({
         result shouldContain ": (root)"
     }
 
+    test("lists transitively affected project with multiple via annotations") {
+        // given
+        val apiMetadata = ProjectMetadata(
+            name = "api",
+            fullyQualifiedName = ":api",
+            changedFiles = listOf("api/src/main/kotlin/Api.kt")
+        )
+        val coreMetadata = ProjectMetadata(
+            name = "core",
+            fullyQualifiedName = ":core",
+            changedFiles = listOf("core/src/main/kotlin/Core.kt")
+        )
+        val appMetadata = ProjectMetadata(
+            name = "app",
+            fullyQualifiedName = ":app",
+            dependencies = listOf(apiMetadata, coreMetadata)
+        )
+        val printer = ChangedProjectsPrinter()
+
+        // when
+        val result = printer.buildReport(
+            header = "Changed projects:",
+            monorepoProjects = MonorepoProjects(listOf(apiMetadata, coreMetadata, appMetadata))
+        )
+
+        // then
+        result shouldContain ":app"
+        result shouldContain "affected via :api, :core"
+    }
+
     test("multiple directly changed projects are listed sorted") {
         // given
         val printer = ChangedProjectsPrinter()

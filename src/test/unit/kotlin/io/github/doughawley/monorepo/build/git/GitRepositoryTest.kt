@@ -53,33 +53,6 @@ class GitRepositoryTest : FunSpec({
         }
     }
 
-    // --- diffBranch ---
-
-    test("diffBranch returns files changed since the base ref") {
-        // given — create a branch at the initial commit, then add a new file on the current branch
-        git(repoDir, "branch", "base")
-        File(repoDir, "added.kt").writeText("new code")
-        git(repoDir, "add", "added.kt")
-        git(repoDir, "commit", "-m", "add file")
-
-        // when
-        val result = GitRepository(repoDir, logger).diffBranch("base")
-
-        // then
-        result shouldContain "added.kt"
-    }
-
-    test("diffBranch returns empty list when nothing has changed since the base ref") {
-        // given — branch points at HEAD, nothing new committed
-        git(repoDir, "branch", "base")
-
-        // when
-        val result = GitRepository(repoDir, logger).diffBranch("base")
-
-        // then
-        result.shouldBeEmpty()
-    }
-
     // --- diffFromRef ---
 
     test("diffFromRef returns files changed since the given commit ref") {

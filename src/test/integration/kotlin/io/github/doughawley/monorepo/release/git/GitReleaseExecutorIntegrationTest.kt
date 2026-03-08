@@ -287,6 +287,14 @@ class GitReleaseExecutorIntegrationTest : FunSpec({
         repoListener.repo.remoteBranchExists("release/app/v1.0.x") shouldBe true
     }
 
+    test("pushBranchesAtomically with empty list succeeds without pushing any branches") {
+        // given / when — empty list results in `git push --atomic origin` with no refspecs
+        executor().pushBranchesAtomically(emptyList())
+
+        // then — no branches were pushed to remote (only the default branch exists)
+        repoListener.repo.remoteBranchExists("release/app/v1.0.x") shouldBe false
+    }
+
     test("pushBranchesAtomically throws when a branch does not exist locally") {
         // given / when / then
         val ex = shouldThrow<GradleException> {

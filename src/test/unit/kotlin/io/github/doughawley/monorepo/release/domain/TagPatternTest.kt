@@ -120,4 +120,18 @@ class TagPatternTest : FunSpec({
             TagPattern.parseProjectPrefixFromBranch(branch, globalPrefix) shouldBe expectedPrefix
         }
     }
+
+    test("branch-to-project matching works for nested project paths") {
+        // given — a nested project like :services:auth-v2 derives to "services-auth-v2"
+        val gradlePath = ":services:auth-v2"
+        val projectPrefix = TagPattern.deriveProjectTagPrefix(gradlePath)
+
+        // when — the release branch uses that derived prefix
+        val branch = "release/$projectPrefix/v1.0.x"
+        val parsedPrefix = TagPattern.parseProjectPrefixFromBranch(branch, "release")
+
+        // then — round-trip: derived prefix matches parsed prefix
+        parsedPrefix shouldBe projectPrefix
+        parsedPrefix shouldBe "services-auth-v2"
+    }
 })
