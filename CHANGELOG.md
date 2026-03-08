@@ -4,6 +4,18 @@ All notable changes to this project will be documented in this file.
 
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.3.5](https://github.com/doug-hawley/monorepo-build-release-plugin/compare/v0.3.4...v0.3.5) (2026-03-08)
+
+
+### Bug Fixes
+
+* bootstrap last-successful-build tag when no projects have changed ([7f91920](https://github.com/doug-hawley/monorepo-build-release-plugin/commit/7f919206bde2243b6009768d10739d16354bf3e4))
+
+
+### Miscellaneous Chores
+
+* remove dead diffBranch code and add edge case tests ([40046f9](https://github.com/doug-hawley/monorepo-build-release-plugin/commit/40046f9da5934725842a3a71f7d782ecdd0d1e58))
+
 ## [0.3.4](https://github.com/doug-hawley/monorepo-build-release-plugin/compare/v0.3.3...v0.3.4) (2026-03-08)
 
 
