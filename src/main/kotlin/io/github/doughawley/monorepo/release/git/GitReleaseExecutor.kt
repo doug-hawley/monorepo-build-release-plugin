@@ -90,7 +90,7 @@ class GitReleaseExecutor(
     }
 
     fun branchExistsLocally(branch: String): Boolean {
-        val result = executor.execute(rootDir, "rev-parse", "--verify", "refs/heads/$branch")
-        return result.success
+        val result = executor.execute(rootDir, "branch", "--list", branch)
+        return result.success && result.output.isNotEmpty()
     }
 }
