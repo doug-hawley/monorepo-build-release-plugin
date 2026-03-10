@@ -96,6 +96,40 @@ class BuildChangedProjectsAndCreateReleaseBranchesFunctionalTest : FunSpec({
     }
 
     // ─────────────────────────────────────────────────────────────
+    // Tag-based baseline (not origin/main)
+    // ─────────────────────────────────────────────────────────────
+
+    test("uses last-successful-build tag as baseline, not origin/main") {
+        // given: tag and origin/main at different commits to prove which is used
+        val project = StandardReleaseTestProject.createMultiProjectAndInitialize(testListener.getTestProjectDir())
+
+        // Advance past initial state: change lib, push (origin/main moves forward)
+        project.modifyFile("lib/lib.txt", "first change")
+        project.commitAll("Change lib")
+        project.pushToRemote()
+
+        // Create tag HERE — tag is now behind origin/main after next push
+        project.createTag("monorepo/last-successful-build")
+        project.pushTag("monorepo/last-successful-build")
+
+        // Change app and push — origin/main advances to HEAD, tag stays behind
+        project.modifyFile("app/app.txt", "changed after tag")
+        project.commitAll("Change app after tag")
+        project.pushToRemote()
+
+        // Now: tag = commit B, origin/main = HEAD = commit C
+        // If using tag: app changed (diff B..C) → release branch for app
+        // If using origin/main: nothing changed (diff C..C) → no release branches
+
+        // when
+        val result = project.runTask("buildChangedProjectsAndCreateReleaseBranches")
+
+        // then: proves the tag is used — app has a release branch
+        result.task(":buildChangedProjectsAndCreateReleaseBranches")?.outcome shouldBe TaskOutcome.SUCCESS
+        project.remoteBranches() shouldContain "release/app/v0.1.x"
+    }
+
+    // ─────────────────────────────────────────────────────────────
     // Opt-in model
     // ─────────────────────────────────────────────────────────────
 
