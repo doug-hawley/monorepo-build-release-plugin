@@ -81,7 +81,6 @@ class MonorepoBuildReleasePlugin @Inject constructor(
                     rootBuildExtension.resolvedBaseRef = resolvedRef
                     computeMetadata(project.rootProject, rootBuildExtension, resolvedRef)
                     wireDependsOn(project, "buildChangedProjects", rootBuildExtension.allAffectedProjects)
-                    wireDependsOn(project, "buildChangedProjectsAndCreateReleaseBranches", rootBuildExtension.allAffectedProjects)
                     rootBuildExtension.metadataComputed = true
                     project.logger.debug("Changed project metadata computed successfully in configuration phase")
                 } catch (e: GradleException) {
@@ -127,9 +126,10 @@ class MonorepoBuildReleasePlugin @Inject constructor(
 
         // ── Aggregate release task ────────────────────────────────────────────
 
-        project.tasks.register("buildChangedProjectsAndCreateReleaseBranches").configure {
+        project.tasks.register("createReleaseBranches").configure {
             group = RELEASE_TASK_GROUP
-            description = "Builds changed projects and creates release branches atomically"
+            description = "Creates release branches for changed projects"
+            dependsOn("buildChangedProjects")
             val buildExt = rootBuildExtension
             val releaseExt = rootReleaseExtension
             val ext = rootExtension
@@ -148,7 +148,7 @@ class MonorepoBuildReleasePlugin @Inject constructor(
                 val currentBranch = releaseExecutor.currentBranch()
                 if (currentBranch != ext.primaryBranch) {
                     throw GradleException(
-                        "buildChangedProjectsAndCreateReleaseBranches must run on '${ext.primaryBranch}', " +
+                        "createReleaseBranches must run on '${ext.primaryBranch}', " +
                         "but the current branch is '$currentBranch'."
                     )
                 }
@@ -208,7 +208,7 @@ class MonorepoBuildReleasePlugin @Inject constructor(
      * Resolves the base ref for change detection.
      *
      * The baseline depends on which task the user requested:
-     * - If `buildChangedProjectsAndCreateReleaseBranches` is requested (CI release build) →
+     * - If `createReleaseBranches` is requested (CI release build) →
      *   use the last-successful-build tag; fall back to `origin/{primaryBranch}` if the tag
      *   does not exist
      * - Otherwise (local dev / PR build) → use `origin/{primaryBranch}` directly
@@ -224,8 +224,8 @@ class MonorepoBuildReleasePlugin @Inject constructor(
 
         val requestedTasks = project.gradle.startParameter.taskNames
         val isReleaseRun = requestedTasks.any { taskName ->
-            taskName == "buildChangedProjectsAndCreateReleaseBranches" ||
-            taskName == ":buildChangedProjectsAndCreateReleaseBranches"
+            taskName == "createReleaseBranches" ||
+            taskName == ":createReleaseBranches"
         }
 
         if (isReleaseRun) {
