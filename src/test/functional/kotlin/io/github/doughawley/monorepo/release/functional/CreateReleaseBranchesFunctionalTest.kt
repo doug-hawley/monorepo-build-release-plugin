@@ -31,6 +31,29 @@ class CreateReleaseBranchesFunctionalTest : FunSpec({
     }
 
     // ─────────────────────────────────────────────────────────────
+    // Build dependency chain
+    // ─────────────────────────────────────────────────────────────
+
+    test("runs buildChangedProjects and subproject build tasks before creating release branches") {
+        // given
+        val project = StandardReleaseTestProject.createMultiProjectAndInitialize(testListener.getTestProjectDir())
+        project.createTag("monorepo/last-successful-build")
+        project.pushTag("monorepo/last-successful-build")
+        project.modifyFile("app/app.txt", "changed")
+        project.modifyFile("lib/lib.txt", "changed")
+        project.commitAll("Change both")
+
+        // when
+        val result = project.runTask("createReleaseBranches")
+
+        // then: the full dependency chain executed
+        result.task(":buildChangedProjects")?.outcome shouldBe TaskOutcome.SUCCESS
+        result.task(":app:build")?.outcome shouldBe TaskOutcome.SUCCESS
+        result.task(":lib:build")?.outcome shouldBe TaskOutcome.SUCCESS
+        result.task(":createReleaseBranches")?.outcome shouldBe TaskOutcome.SUCCESS
+    }
+
+    // ─────────────────────────────────────────────────────────────
     // No changed projects
     // ─────────────────────────────────────────────────────────────
 
