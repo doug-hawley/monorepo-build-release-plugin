@@ -7,7 +7,7 @@ import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
 import org.gradle.testkit.runner.TaskOutcome
 
-class BuildChangedProjectsAndCreateReleaseBranchesFunctionalTest : FunSpec({
+class CreateReleaseBranchesFunctionalTest : FunSpec({
 
     val testListener = extension(ReleaseTestProjectListener())
 
@@ -23,7 +23,7 @@ class BuildChangedProjectsAndCreateReleaseBranchesFunctionalTest : FunSpec({
         project.createBranch("feature/something")
 
         // when
-        val result = project.runTaskAndFail("buildChangedProjectsAndCreateReleaseBranches")
+        val result = project.runTaskAndFail("createReleaseBranches")
 
         // then
         result.output shouldContain "must run on 'main'"
@@ -42,10 +42,10 @@ class BuildChangedProjectsAndCreateReleaseBranchesFunctionalTest : FunSpec({
         val headCommit = project.headCommit()
 
         // when
-        val result = project.runTask("buildChangedProjectsAndCreateReleaseBranches")
+        val result = project.runTask("createReleaseBranches")
 
         // then: tag still updated (idempotent) even when no changes detected
-        result.task(":buildChangedProjectsAndCreateReleaseBranches")?.outcome shouldBe TaskOutcome.SUCCESS
+        result.task(":createReleaseBranches")?.outcome shouldBe TaskOutcome.SUCCESS
         result.output shouldContain "No projects have changed"
         project.remoteBranches().filter { it.startsWith("release/") } shouldBe emptyList()
         project.remoteTagCommit("monorepo/last-successful-build") shouldBe headCommit
@@ -65,10 +65,10 @@ class BuildChangedProjectsAndCreateReleaseBranchesFunctionalTest : FunSpec({
         val headCommit = project.headCommit()
 
         // when
-        val result = project.runTask("buildChangedProjectsAndCreateReleaseBranches")
+        val result = project.runTask("createReleaseBranches")
 
         // then
-        result.task(":buildChangedProjectsAndCreateReleaseBranches")?.outcome shouldBe TaskOutcome.SUCCESS
+        result.task(":createReleaseBranches")?.outcome shouldBe TaskOutcome.SUCCESS
         project.remoteBranches() shouldContain "release/app/v0.1.x"
         project.remoteBranches() shouldNotContain "release/lib/v0.1.x"
         project.remoteTagCommit("monorepo/last-successful-build") shouldBe headCommit
@@ -87,10 +87,10 @@ class BuildChangedProjectsAndCreateReleaseBranchesFunctionalTest : FunSpec({
         project.commitAll("Change both")
 
         // when
-        val result = project.runTask("buildChangedProjectsAndCreateReleaseBranches")
+        val result = project.runTask("createReleaseBranches")
 
         // then
-        result.task(":buildChangedProjectsAndCreateReleaseBranches")?.outcome shouldBe TaskOutcome.SUCCESS
+        result.task(":createReleaseBranches")?.outcome shouldBe TaskOutcome.SUCCESS
         project.remoteBranches() shouldContain "release/app/v0.1.x"
         project.remoteBranches() shouldContain "release/lib/v0.1.x"
     }
@@ -122,10 +122,10 @@ class BuildChangedProjectsAndCreateReleaseBranchesFunctionalTest : FunSpec({
         // If using origin/main: nothing changed (diff C..C) → no release branches
 
         // when
-        val result = project.runTask("buildChangedProjectsAndCreateReleaseBranches")
+        val result = project.runTask("createReleaseBranches")
 
         // then: proves the tag is used — app has a release branch
-        result.task(":buildChangedProjectsAndCreateReleaseBranches")?.outcome shouldBe TaskOutcome.SUCCESS
+        result.task(":createReleaseBranches")?.outcome shouldBe TaskOutcome.SUCCESS
         project.remoteBranches() shouldContain "release/app/v0.1.x"
     }
 
@@ -145,10 +145,10 @@ class BuildChangedProjectsAndCreateReleaseBranchesFunctionalTest : FunSpec({
         project.commitAll("Change both")
 
         // when
-        val result = project.runTask("buildChangedProjectsAndCreateReleaseBranches")
+        val result = project.runTask("createReleaseBranches")
 
         // then
-        result.task(":buildChangedProjectsAndCreateReleaseBranches")?.outcome shouldBe TaskOutcome.SUCCESS
+        result.task(":createReleaseBranches")?.outcome shouldBe TaskOutcome.SUCCESS
         project.remoteBranches() shouldContain "release/app/v0.1.x"
         project.remoteBranches() shouldNotContain "release/lib/v0.1.x"
     }
@@ -173,10 +173,10 @@ class BuildChangedProjectsAndCreateReleaseBranchesFunctionalTest : FunSpec({
         project.commitAll("Change both")
 
         // when
-        val result = project.runTask("buildChangedProjectsAndCreateReleaseBranches")
+        val result = project.runTask("createReleaseBranches")
 
         // then
-        result.task(":buildChangedProjectsAndCreateReleaseBranches")?.outcome shouldBe TaskOutcome.SUCCESS
+        result.task(":createReleaseBranches")?.outcome shouldBe TaskOutcome.SUCCESS
         project.remoteBranches() shouldContain "release/app/v1.0.x"
         project.remoteBranches() shouldContain "release/lib/v1.0.x"
     }
@@ -198,7 +198,7 @@ class BuildChangedProjectsAndCreateReleaseBranchesFunctionalTest : FunSpec({
         project.checkoutBranch("main")
 
         // when
-        val result = project.runTaskAndFail("buildChangedProjectsAndCreateReleaseBranches")
+        val result = project.runTaskAndFail("createReleaseBranches")
 
         // then: task fails; neither branch pushed; tag not updated
         result.output shouldContain "already exists locally"
@@ -238,7 +238,7 @@ class BuildChangedProjectsAndCreateReleaseBranchesFunctionalTest : FunSpec({
         project.commitAll("Change app")
 
         // when
-        val result = project.runTaskAndFail("buildChangedProjectsAndCreateReleaseBranches")
+        val result = project.runTaskAndFail("createReleaseBranches")
 
         // then: tag should NOT have moved
         result.output shouldContain "Simulated build failure"
@@ -258,10 +258,10 @@ class BuildChangedProjectsAndCreateReleaseBranchesFunctionalTest : FunSpec({
         project.commitAll("Change all projects")
 
         // when
-        val result = project.runTask("buildChangedProjectsAndCreateReleaseBranches")
+        val result = project.runTask("createReleaseBranches")
 
         // then: falls back to origin/main, detects changes, creates release branches
-        result.task(":buildChangedProjectsAndCreateReleaseBranches")?.outcome shouldBe TaskOutcome.SUCCESS
+        result.task(":createReleaseBranches")?.outcome shouldBe TaskOutcome.SUCCESS
         result.output shouldContain "falling back to 'origin/main'"
         project.remoteBranches() shouldContain "release/app/v0.1.x"
         project.remoteBranches() shouldContain "release/lib/v0.1.x"
@@ -305,10 +305,10 @@ class BuildChangedProjectsAndCreateReleaseBranchesFunctionalTest : FunSpec({
         val headCommit = project.headCommit()
 
         // when
-        val result = project.runTask("buildChangedProjectsAndCreateReleaseBranches")
+        val result = project.runTask("createReleaseBranches")
 
         // then: tag still updated even though no release branches were created
-        result.task(":buildChangedProjectsAndCreateReleaseBranches")?.outcome shouldBe TaskOutcome.SUCCESS
+        result.task(":createReleaseBranches")?.outcome shouldBe TaskOutcome.SUCCESS
         result.output shouldContain "no release branches to create"
         project.remoteBranches().filter { it.startsWith("release/") } shouldBe emptyList()
         project.remoteTagCommit("monorepo/last-successful-build") shouldBe headCommit
