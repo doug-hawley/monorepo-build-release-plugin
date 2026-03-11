@@ -153,6 +153,43 @@ class CreateReleaseBranchesFunctionalTest : FunSpec({
     }
 
     // ─────────────────────────────────────────────────────────────
+    // Tag fetch from remote (CI scenario)
+    // ─────────────────────────────────────────────────────────────
+
+    test("fetches tag from remote when not available locally") {
+        // given: tag exists on remote but not locally (simulates CI checkout without tags)
+        val project = StandardReleaseTestProject.createMultiProjectAndInitialize(testListener.getTestProjectDir())
+
+        // Advance past initial state: change lib, push (origin/main moves forward)
+        project.modifyFile("lib/lib.txt", "first change")
+        project.commitAll("Change lib")
+        project.pushToRemote()
+
+        // Create tag HERE — tag is now behind origin/main after next push
+        project.createTag("monorepo/last-successful-build")
+        project.pushTag("monorepo/last-successful-build")
+
+        // Change app and push — origin/main advances to HEAD, tag stays behind
+        project.modifyFile("app/app.txt", "changed after tag")
+        project.commitAll("Change app after tag")
+        project.pushToRemote()
+
+        // Delete local tag to simulate CI checkout that doesn't fetch tags
+        project.deleteLocalTag("monorepo/last-successful-build")
+
+        // Now: tag only on remote at commit B, origin/main = HEAD = commit C
+        // If tag is fetched and used: app changed (diff B..C) → release branch for app
+        // If origin/main is used: nothing changed (diff C..C) → no release branches
+
+        // when
+        val result = project.runTask("createReleaseBranches")
+
+        // then: proves the tag was fetched from remote and used as baseline
+        result.task(":createReleaseBranches")?.outcome shouldBe TaskOutcome.SUCCESS
+        project.remoteBranches() shouldContain "release/app/v0.1.x"
+    }
+
+    // ─────────────────────────────────────────────────────────────
     // Opt-in model
     // ─────────────────────────────────────────────────────────────
 

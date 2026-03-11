@@ -86,7 +86,21 @@ open class GitRepository(
     /** Returns true if [ref] resolves to an existing object in this repository. */
     open fun refExists(ref: String): Boolean {
         val dir = gitDir ?: return false
-        return gitExecutor.execute(dir, "rev-parse", "--verify", ref).success
+        return gitExecutor.executeSilently(dir, "rev-parse", "--verify", ref).success
+    }
+
+    /**
+     * Fetches a tag from a remote, updating the local tag to match.
+     * Uses `git fetch <remote> tag <tagName> --force --quiet` so the local
+     * tag ref is created or updated (not just FETCH_HEAD).
+     *
+     * Returns true if the fetch succeeded, false otherwise (e.g. no remote
+     * configured, network error, tag not found on remote). Failure is expected
+     * on first runs when the tag has never been pushed.
+     */
+    open fun fetchTag(remote: String, tagName: String): Boolean {
+        val dir = gitDir ?: return false
+        return gitExecutor.executeSilently(dir, "fetch", remote, "tag", tagName, "--force", "--quiet").success
     }
 
     private fun findGitRoot(startDir: File): File? {

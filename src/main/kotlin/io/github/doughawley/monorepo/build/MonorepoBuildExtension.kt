@@ -12,8 +12,11 @@ open class MonorepoBuildExtension {
      * last successful build.
      *
      * This tag is only used as baseline when the `createReleaseBranches`
-     * task is requested (CI release builds). For all other tasks (`printChangedProjects`,
-     * `buildChangedProjects`), the plugin uses `origin/{primaryBranch}` as the baseline instead.
+     * task is requested (CI release builds). Before checking for the tag locally,
+     * the plugin fetches it from origin to ensure the local copy is current
+     * (many CI environments do not fetch tags by default). For all other tasks
+     * (`printChangedProjects`, `buildChangedProjects`), the plugin uses
+     * `origin/{primaryBranch}` as the baseline instead.
      *
      * When the chosen ref does not exist, all projects are treated as changed.
      */

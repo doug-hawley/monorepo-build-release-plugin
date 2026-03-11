@@ -181,6 +181,94 @@ class GitRepositoryTest : FunSpec({
     test("refExists returns false for a ref that does not exist") {
         GitRepository(repoDir, logger).refExists("nonexistent-branch") shouldBe false
     }
+
+    // --- fetchTag ---
+
+    test("fetchTag returns true and restores local tag when tag exists on remote") {
+        // given: set up a bare remote and push the initial commit
+        val remoteDir = Files.createTempDirectory("test-git-remote").toFile()
+        git(remoteDir, "init", "--bare")
+        git(repoDir, "remote", "add", "origin", remoteDir.absolutePath)
+        git(repoDir, "push", "-u", "origin", "main")
+
+        // Create and push a tag, then delete it locally
+        git(repoDir, "tag", "my-tag")
+        git(repoDir, "push", "origin", "my-tag")
+        git(repoDir, "tag", "-d", "my-tag")
+
+        val repo = GitRepository(repoDir, logger)
+        repo.refExists("my-tag") shouldBe false
+
+        // when
+        val result = repo.fetchTag("origin", "my-tag")
+
+        // then
+        result shouldBe true
+        repo.refExists("my-tag") shouldBe true
+        remoteDir.deleteRecursively()
+    }
+
+    test("fetchTag returns false when tag does not exist on remote") {
+        // given
+        val remoteDir = Files.createTempDirectory("test-git-remote").toFile()
+        git(remoteDir, "init", "--bare")
+        git(repoDir, "remote", "add", "origin", remoteDir.absolutePath)
+        git(repoDir, "push", "-u", "origin", "main")
+
+        val repo = GitRepository(repoDir, logger)
+
+        // when
+        val result = repo.fetchTag("origin", "nonexistent-tag")
+
+        // then
+        result shouldBe false
+        remoteDir.deleteRecursively()
+    }
+
+    test("fetchTag returns false when not inside a git repository") {
+        // given
+        val nonGitDir = Files.createTempDirectory("test-no-git").toFile()
+
+        // when
+        val result = GitRepository(nonGitDir, logger).fetchTag("origin", "my-tag")
+
+        // then
+        result shouldBe false
+        nonGitDir.deleteRecursively()
+    }
+
+    test("fetchTag updates local tag when remote tag has moved") {
+        // given: set up remote, create tag, push it
+        val remoteDir = Files.createTempDirectory("test-git-remote").toFile()
+        git(remoteDir, "init", "--bare")
+        git(repoDir, "remote", "add", "origin", remoteDir.absolutePath)
+        git(repoDir, "tag", "movable-tag")
+        git(repoDir, "push", "-u", "origin", "main")
+        git(repoDir, "push", "origin", "movable-tag")
+        val originalCommit = captureOutput(repoDir, "rev-parse", "movable-tag")
+
+        // Make a new commit and force-move the tag on the remote
+        File(repoDir, "new-file.txt").writeText("new content")
+        git(repoDir, "add", "new-file.txt")
+        git(repoDir, "commit", "-m", "second commit")
+        git(repoDir, "tag", "-f", "movable-tag")
+        git(repoDir, "push", "origin", "-f", "refs/tags/movable-tag")
+        val newCommit = captureOutput(repoDir, "rev-parse", "movable-tag")
+
+        // Reset local tag back to original to simulate stale local state
+        git(repoDir, "tag", "-f", "movable-tag", originalCommit)
+        captureOutput(repoDir, "rev-parse", "movable-tag") shouldBe originalCommit
+
+        val repo = GitRepository(repoDir, logger)
+
+        // when
+        val result = repo.fetchTag("origin", "movable-tag")
+
+        // then
+        result shouldBe true
+        captureOutput(repoDir, "rev-parse", "movable-tag") shouldBe newCommit
+        remoteDir.deleteRecursively()
+    }
 })
 
 private fun git(directory: File, vararg command: String) {

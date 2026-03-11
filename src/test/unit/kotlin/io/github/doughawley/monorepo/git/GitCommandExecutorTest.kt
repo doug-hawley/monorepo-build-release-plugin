@@ -276,6 +276,44 @@ class GitCommandExecutorTest : FunSpec({
         result.exitCode shouldBe 1
         tempDir.deleteRecursively()
     }
+
+    // --- executeSilently ---
+
+    test("executeSilently should return success for a valid command") {
+        // given
+        val tempDir = Files.createTempDirectory("test-silent-success").toFile()
+        executeGitCommand(tempDir, "init")
+        executeGitCommand(tempDir, "config", "user.email", "test@example.com")
+        executeGitCommand(tempDir, "config", "user.name", "Test User")
+
+        val logger = ProjectBuilder.builder().build().logger
+        val executor = GitCommandExecutor(logger)
+
+        // when
+        val result = executor.executeSilently(tempDir, "status", "--short")
+
+        // then
+        result.success shouldBe true
+        result.exitCode shouldBe 0
+        tempDir.deleteRecursively()
+    }
+
+    test("executeSilently should return failure without logging warnings") {
+        // given
+        val tempDir = Files.createTempDirectory("test-silent-fail").toFile()
+        val logger = ProjectBuilder.builder().build().logger
+        val executor = GitCommandExecutor(logger)
+
+        // when
+        val result = executor.executeSilently(tempDir, "status")
+
+        // then
+        result.success shouldBe false
+        result.output.shouldBeEmpty()
+        result.exitCode shouldBe 128
+        result.errorOutput.isNotEmpty() shouldBe true
+        tempDir.deleteRecursively()
+    }
 })
 
 private fun executeGitCommand(directory: File, vararg command: String) {
