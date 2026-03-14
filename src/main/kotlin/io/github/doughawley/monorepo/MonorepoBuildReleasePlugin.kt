@@ -220,8 +220,9 @@ class MonorepoBuildReleasePlugin @Inject constructor(
      * The baseline depends on which task the user requested:
      * - If `createReleaseBranches` is requested (CI release build) →
      *   fetch the last-successful-build tag from origin (many CI environments
-     *   do not fetch tags by default), then use it; fall back to
-     *   `origin/{primaryBranch}` if the tag does not exist
+     *   do not fetch tags by default), then use it; if the tag does not exist,
+     *   return null so all projects are treated as changed (the first build on
+     *   main has no prior successful build to compare against)
      * - Otherwise (local dev / PR build) → use `origin/{primaryBranch}` directly
      *
      * If the chosen ref does not exist, returns null (all projects treated as changed).
@@ -249,14 +250,8 @@ class MonorepoBuildReleasePlugin @Inject constructor(
                 project.logger.debug("Using last-successful-build tag '$tag' as base ref")
                 return tag
             }
-            if (gitRepository.refExists(remoteBranch)) {
-                project.logger.lifecycle(
-                    "Tag '$tag' not found — falling back to '$remoteBranch' as base ref."
-                )
-                return remoteBranch
-            }
             project.logger.lifecycle(
-                "Tag '$tag' not found and '$remoteBranch' is not available — no baseline exists. " +
+                "Tag '$tag' not found — no baseline exists. " +
                 "All projects will be treated as changed."
             )
             return null

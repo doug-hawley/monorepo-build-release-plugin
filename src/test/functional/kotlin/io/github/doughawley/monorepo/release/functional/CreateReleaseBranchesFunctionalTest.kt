@@ -327,23 +327,20 @@ class CreateReleaseBranchesFunctionalTest : FunSpec({
     }
 
     // ─────────────────────────────────────────────────────────────
-    // No tag — falls back to origin/main
+    // No tag — all projects treated as changed
     // ─────────────────────────────────────────────────────────────
 
     test("creates release branches for all opted-in projects when tag does not exist") {
-        // given: no tag — falls back to origin/main; make changes so projects are detected
+        // given: no tag — all projects treated as changed (no baseline)
         val project = StandardReleaseTestProject.createMultiProjectAndInitialize(testListener.getTestProjectDir())
-        project.modifyFile("app/app.txt", "changed app")
-        project.modifyFile("lib/lib.txt", "changed lib")
-        project.commitAll("Change all projects")
 
         // when
         val result = project.runTask("createReleaseBranches")
 
-        // then: falls back to origin/main, detects changes, creates release branches
+        // then: no baseline, all projects treated as changed, release branches created
         result.task(":createReleaseBranches")?.outcome shouldBe TaskOutcome.SUCCESS
-        result.output shouldContain "falling back to 'origin/main'"
-        result.output shouldContain "Change detection baseline: origin/main ("
+        result.output shouldContain "no baseline exists"
+        result.output shouldContain "Change detection baseline: none (all projects treated as changed)"
         project.remoteBranches() shouldContain "release/app/v0.1.x"
         project.remoteBranches() shouldContain "release/lib/v0.1.x"
     }
