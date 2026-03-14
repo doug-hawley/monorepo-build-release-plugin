@@ -79,6 +79,16 @@ class MonorepoBuildReleasePlugin @Inject constructor(
                 try {
                     val resolvedRef = resolveBaseRef(project.rootProject, rootExtension)
                     rootBuildExtension.resolvedBaseRef = resolvedRef
+
+                    val gitRepository = GitRepository(project.rootProject.rootDir, project.logger)
+                    if (resolvedRef != null) {
+                        val resolvedCommit = gitRepository.resolveCommit(resolvedRef)
+                        rootBuildExtension.resolvedBaseCommit = resolvedCommit
+                        project.logger.lifecycle("Change detection baseline: $resolvedRef ($resolvedCommit)")
+                    } else {
+                        project.logger.lifecycle("Change detection baseline: none (all projects treated as changed)")
+                    }
+
                     computeMetadata(project.rootProject, rootBuildExtension, resolvedRef)
                     wireDependsOn(project, "buildChangedProjects", rootBuildExtension.allAffectedProjects)
                     rootBuildExtension.metadataComputed = true
@@ -236,7 +246,7 @@ class MonorepoBuildReleasePlugin @Inject constructor(
             gitRepository.fetchTag("origin", tag)
 
             if (gitRepository.refExists(tag)) {
-                project.logger.info("Using last-successful-build tag '$tag' as base ref")
+                project.logger.debug("Using last-successful-build tag '$tag' as base ref")
                 return tag
             }
             if (gitRepository.refExists(remoteBranch)) {
@@ -253,7 +263,7 @@ class MonorepoBuildReleasePlugin @Inject constructor(
         }
 
         if (gitRepository.refExists(remoteBranch)) {
-            project.logger.info("Using '$remoteBranch' as base ref")
+            project.logger.debug("Using '$remoteBranch' as base ref")
             return remoteBranch
         }
 

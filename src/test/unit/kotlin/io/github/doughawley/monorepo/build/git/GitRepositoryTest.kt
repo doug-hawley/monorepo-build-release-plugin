@@ -6,6 +6,7 @@ import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.collections.shouldContain
 import io.kotest.matchers.collections.shouldNotContain
 import io.kotest.matchers.shouldBe
+import io.kotest.matchers.shouldNotBe
 import io.mockk.mockk
 import java.io.File
 import java.nio.file.Files
@@ -180,6 +181,41 @@ class GitRepositoryTest : FunSpec({
 
     test("refExists returns false for a ref that does not exist") {
         GitRepository(repoDir, logger).refExists("nonexistent-branch") shouldBe false
+    }
+
+    // --- resolveCommit ---
+
+    test("resolveCommit returns short hash for an existing ref") {
+        // given — HEAD exists after initial commit
+
+        // when
+        val result = GitRepository(repoDir, logger).resolveCommit("HEAD")
+
+        // then
+        result shouldNotBe null
+        result!!.length shouldBe 7
+    }
+
+    test("resolveCommit returns null for a non-existent ref") {
+        // when
+        val result = GitRepository(repoDir, logger).resolveCommit("nonexistent-ref-xyz")
+
+        // then
+        result shouldBe null
+    }
+
+    test("resolveCommit returns null when not in a git repository") {
+        // given
+        val nonGitDir = Files.createTempDirectory("test-no-git").toFile()
+        try {
+            // when
+            val result = GitRepository(nonGitDir, logger).resolveCommit("HEAD")
+
+            // then
+            result shouldBe null
+        } finally {
+            nonGitDir.deleteRecursively()
+        }
     }
 
     // --- fetchTag ---

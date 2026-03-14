@@ -44,6 +44,13 @@ open class MonorepoBuildExtension {
         internal set
 
     /**
+     * The abbreviated commit SHA that [resolvedBaseRef] points to, or null when no baseline exists.
+     * Set alongside [resolvedBaseRef] after ref resolution.
+     */
+    var resolvedBaseCommit: String? = null
+        internal set
+
+    /**
      * All monorepo projects with their metadata and change information.
      * Available after configuration phase completes.
      */

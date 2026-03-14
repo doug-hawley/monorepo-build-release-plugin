@@ -305,6 +305,7 @@ class PrintChangedProjectsFunctionalTest : FunSpec({
 
         // then
         result.task(":printChangedProjects")?.outcome shouldBe TaskOutcome.SUCCESS
-        result.output shouldContain "Changed projects (since origin/main):"
+        result.output shouldContain "Change detection baseline: origin/main ("
+        result.output shouldContain "Changed projects (since origin/main @"
     }
 })

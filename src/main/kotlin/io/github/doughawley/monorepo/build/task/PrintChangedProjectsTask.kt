@@ -34,8 +34,10 @@ abstract class PrintChangedProjectsTask : DefaultTask() {
         }
 
         val resolvedRef = buildExtension.resolvedBaseRef
+        val resolvedCommit = buildExtension.resolvedBaseCommit
         val header = if (resolvedRef != null) {
-            "Changed projects (since $resolvedRef):"
+            val commitSuffix = if (resolvedCommit != null) " @ $resolvedCommit" else ""
+            "Changed projects (since $resolvedRef$commitSuffix):"
         } else {
             "Changed projects (no baseline — all projects):"
         }

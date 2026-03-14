@@ -149,6 +149,7 @@ class CreateReleaseBranchesFunctionalTest : FunSpec({
 
         // then: proves the tag is used — app has a release branch
         result.task(":createReleaseBranches")?.outcome shouldBe TaskOutcome.SUCCESS
+        result.output shouldContain "Change detection baseline: monorepo/last-successful-build ("
         project.remoteBranches() shouldContain "release/app/v0.1.x"
     }
 
@@ -342,6 +343,7 @@ class CreateReleaseBranchesFunctionalTest : FunSpec({
         // then: falls back to origin/main, detects changes, creates release branches
         result.task(":createReleaseBranches")?.outcome shouldBe TaskOutcome.SUCCESS
         result.output shouldContain "falling back to 'origin/main'"
+        result.output shouldContain "Change detection baseline: origin/main ("
         project.remoteBranches() shouldContain "release/app/v0.1.x"
         project.remoteBranches() shouldContain "release/lib/v0.1.x"
     }

@@ -89,6 +89,13 @@ open class GitRepository(
         return gitExecutor.executeSilently(dir, "rev-parse", "--verify", ref).success
     }
 
+    /** Returns the abbreviated commit SHA for [ref], or null if the ref does not exist. */
+    open fun resolveCommit(ref: String): String? {
+        val dir = gitDir ?: return null
+        val result = gitExecutor.executeSilently(dir, "rev-parse", "--short", ref)
+        return if (result.success) result.output.firstOrNull()?.trim() else null
+    }
+
     /**
      * Fetches a tag from a remote, updating the local tag to match.
      * Uses `git fetch <remote> tag <tagName> --force --quiet` so the local

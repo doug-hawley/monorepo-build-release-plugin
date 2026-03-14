@@ -187,6 +187,24 @@ class BuildChangedProjectsFunctionalTest : FunSpec({
         )
     }
 
+    test("buildChangedProjects logs the change detection baseline") {
+        // given
+        val project = StandardTestProject.createAndInitialize(
+            testProjectListener.getTestProjectDir(),
+            withRemote = true
+        )
+
+        project.appendToFile(Files.APP2_SOURCE, "\n// Modified")
+        project.commitAll("Modify app2")
+
+        // when
+        val result = project.runTask("buildChangedProjects")
+
+        // then
+        result.task(":buildChangedProjects")?.outcome shouldBe TaskOutcome.SUCCESS
+        result.output shouldContain "Change detection baseline: origin/main ("
+    }
+
     // --- origin/main baseline scenarios ---
 
     test("buildChangedProjects uses origin/main as baseline and detects direct change") {
@@ -290,6 +308,7 @@ class BuildChangedProjectsFunctionalTest : FunSpec({
         // then: no origin/main — no baseline exists
         result.task(":buildChangedProjects")?.outcome shouldBe TaskOutcome.SUCCESS
         result.output shouldContain "no baseline"
+        result.output shouldContain "Change detection baseline: none"
         val built = result.extractBuiltProjects()
         built shouldContain Projects.APP1
         built shouldContain Projects.APP2
