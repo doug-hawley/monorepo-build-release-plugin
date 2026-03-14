@@ -237,6 +237,18 @@ class GitRepositoryTest : FunSpec({
         nonGitDir.deleteRecursively()
     }
 
+    test("fetchTag throws when fetch fails for an unexpected reason") {
+        // given: remote points to a non-existent path
+        git(repoDir, "remote", "add", "origin", "/nonexistent/path/to/repo")
+
+        val repo = GitRepository(repoDir, logger)
+
+        // when / then
+        shouldThrow<RuntimeException> {
+            repo.fetchTag("origin", "my-tag")
+        }
+    }
+
     test("fetchTag updates local tag when remote tag has moved") {
         // given: set up remote, create tag, push it
         val remoteDir = Files.createTempDirectory("test-git-remote").toFile()

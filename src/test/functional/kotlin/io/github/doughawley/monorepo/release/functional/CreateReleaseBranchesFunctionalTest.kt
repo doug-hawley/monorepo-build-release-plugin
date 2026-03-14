@@ -189,6 +189,25 @@ class CreateReleaseBranchesFunctionalTest : FunSpec({
         project.remoteBranches() shouldContain "release/app/v0.1.x"
     }
 
+    test("fails when remote is unreachable during tag fetch") {
+        // given: set up project, then break the remote URL
+        val project = StandardReleaseTestProject.createMultiProjectAndInitialize(testListener.getTestProjectDir())
+        project.createTag("monorepo/last-successful-build")
+        project.pushTag("monorepo/last-successful-build")
+        project.deleteLocalTag("monorepo/last-successful-build")
+        project.modifyFile("app/app.txt", "changed")
+        project.commitAll("Change app")
+
+        // Point origin to a non-existent path to simulate network/remote failure
+        project.setRemoteUrl("origin", "/nonexistent/path/to/repo")
+
+        // when
+        val result = project.runTaskAndFail("createReleaseBranches")
+
+        // then: build fails with a clear error instead of silently falling back
+        result.output shouldContain "Failed to fetch tag"
+    }
+
     // ─────────────────────────────────────────────────────────────
     // Opt-in model
     // ─────────────────────────────────────────────────────────────

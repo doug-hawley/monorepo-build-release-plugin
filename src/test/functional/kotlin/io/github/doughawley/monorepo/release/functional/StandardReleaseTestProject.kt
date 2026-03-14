@@ -254,6 +254,10 @@ class ReleaseTestProject(
         executeCommand("git", "push", "-u", "origin", "main")
     }
 
+    fun setRemoteUrl(remote: String, url: String) {
+        executeCommand("git", "remote", "set-url", remote, url)
+    }
+
     fun checkoutBranch(name: String) {
         executeCommand("git", "checkout", name)
     }

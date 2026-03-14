@@ -94,13 +94,22 @@ open class GitRepository(
      * Uses `git fetch <remote> tag <tagName> --force --quiet` so the local
      * tag ref is created or updated (not just FETCH_HEAD).
      *
-     * Returns true if the fetch succeeded, false otherwise (e.g. no remote
-     * configured, network error, tag not found on remote). Failure is expected
-     * on first runs when the tag has never been pushed.
+     * @return true if the fetch succeeded, false if the tag does not exist on the remote
+     * @throws RuntimeException if the fetch fails for an unexpected reason
+     *         (network error, authentication failure, remote misconfigured, etc.)
      */
     open fun fetchTag(remote: String, tagName: String): Boolean {
         val dir = gitDir ?: return false
-        return gitExecutor.executeSilently(dir, "fetch", remote, "tag", tagName, "--force", "--quiet").success
+        val result = gitExecutor.executeSilently(dir, "fetch", remote, "tag", tagName, "--force", "--quiet")
+        if (result.success) {
+            return true
+        }
+        if (result.errorOutput.contains("couldn't find remote ref")) {
+            return false
+        }
+        throw RuntimeException(
+            "Failed to fetch tag '$tagName' from '$remote': ${result.errorOutput}"
+        )
     }
 
     private fun findGitRoot(startDir: File): File? {
