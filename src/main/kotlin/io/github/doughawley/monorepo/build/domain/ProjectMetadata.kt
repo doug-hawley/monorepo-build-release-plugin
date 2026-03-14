@@ -10,13 +10,21 @@ data class ProjectMetadata(
      * Returns true if this project has changed files OR any of its dependencies have changes (recursively).
      */
     fun hasChanges(): Boolean {
+        return hasChanges(mutableSetOf())
+    }
+
+    private fun hasChanges(visited: MutableSet<String>): Boolean {
+        if (!visited.add(fullyQualifiedName)) {
+            return false
+        }
+
         // Check if this project has direct changes
         if (changedFiles.isNotEmpty()) {
             return true
         }
 
         // Check if any dependency has changes (recursively)
-        return dependencies.any { it.hasChanges() }
+        return dependencies.any { it.hasChanges(visited) }
     }
 
     /**

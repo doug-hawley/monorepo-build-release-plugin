@@ -27,9 +27,10 @@ class LastSuccessfulBuildTagUpdaterIntegrationTest : FunSpec({
         val updater = createUpdater()
 
         // when
-        updater.updateTag("monorepo/last-successful-build")
+        val result = updater.updateTag("monorepo/last-successful-build")
 
         // then
+        result shouldBe true
         repoListener.repo.localTagExists("monorepo/last-successful-build") shouldBe true
         repoListener.repo.remoteTagExists("monorepo/last-successful-build") shouldBe true
     }
@@ -59,5 +60,27 @@ class LastSuccessfulBuildTagUpdaterIntegrationTest : FunSpec({
         // then
         repoListener.repo.localTagExists("custom/prefix/last-build") shouldBe true
         repoListener.repo.remoteTagExists("custom/prefix/last-build") shouldBe true
+    }
+
+    test("returns false when push to remote fails") {
+        // given: point origin at a non-existent path so the push will fail
+        val executor = GitCommandExecutor(logger)
+        val localDir = repoListener.repo.localDir
+        val brokenRemoteExecutor = GitCommandExecutor(logger)
+
+        // Remove the working remote and add a broken one
+        val removeResult = executor.execute(localDir, "remote", "remove", "origin")
+        removeResult.success shouldBe true
+        val addResult = executor.execute(localDir, "remote", "add", "origin", "/nonexistent/broken/remote")
+        addResult.success shouldBe true
+
+        val updater = LastSuccessfulBuildTagUpdater(localDir, brokenRemoteExecutor, logger)
+
+        // when
+        val result = updater.updateTag("monorepo/last-successful-build")
+
+        // then: tag created locally, but push failed
+        result shouldBe false
+        repoListener.repo.localTagExists("monorepo/last-successful-build") shouldBe true
     }
 })

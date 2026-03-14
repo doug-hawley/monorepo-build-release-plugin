@@ -249,6 +249,23 @@ class GitRepositoryTest : FunSpec({
         }
     }
 
+    test("fetchTag returns false for missing tag with slash-delimited name") {
+        // given: validates exit-code-based detection works for namespaced tags
+        val remoteDir = Files.createTempDirectory("test-git-remote").toFile()
+        git(remoteDir, "init", "--bare")
+        git(repoDir, "remote", "add", "origin", remoteDir.absolutePath)
+        git(repoDir, "push", "-u", "origin", "main")
+
+        val repo = GitRepository(repoDir, logger)
+
+        // when
+        val result = repo.fetchTag("origin", "monorepo/last-successful-build")
+
+        // then
+        result shouldBe false
+        remoteDir.deleteRecursively()
+    }
+
     test("fetchTag updates local tag when remote tag has moved") {
         // given: set up remote, create tag, push it
         val remoteDir = Files.createTempDirectory("test-git-remote").toFile()

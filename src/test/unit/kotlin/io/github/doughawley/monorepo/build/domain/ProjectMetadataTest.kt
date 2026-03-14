@@ -120,6 +120,72 @@ class ProjectMetadataTest : FunSpec({
         buildChain(20, hasChange = false).hasChanges() shouldBe false
     }
 
+    test("hasChanges handles diamond dependency graphs without double-counting") {
+        // given: A → B, A → C, B → D, C → D  (diamond shape, D has changes)
+        val sharedDep = ProjectMetadata(
+            name = "shared",
+            fullyQualifiedName = ":shared",
+            changedFiles = listOf("shared/File.kt")
+        )
+
+        val depB = ProjectMetadata(
+            name = "dep-b",
+            fullyQualifiedName = ":dep-b",
+            dependencies = listOf(sharedDep),
+            changedFiles = emptyList()
+        )
+
+        val depC = ProjectMetadata(
+            name = "dep-c",
+            fullyQualifiedName = ":dep-c",
+            dependencies = listOf(sharedDep),
+            changedFiles = emptyList()
+        )
+
+        val root = ProjectMetadata(
+            name = "root",
+            fullyQualifiedName = ":root",
+            dependencies = listOf(depB, depC),
+            changedFiles = emptyList()
+        )
+
+        // then — visited tracking avoids re-traversing :shared via depC
+        root.hasChanges() shouldBe true
+    }
+
+    test("hasChanges returns false for diamond dependency graph with no changes") {
+        // given: same diamond shape but no changes anywhere
+        val sharedDep = ProjectMetadata(
+            name = "shared",
+            fullyQualifiedName = ":shared",
+            changedFiles = emptyList()
+        )
+
+        val depB = ProjectMetadata(
+            name = "dep-b",
+            fullyQualifiedName = ":dep-b",
+            dependencies = listOf(sharedDep),
+            changedFiles = emptyList()
+        )
+
+        val depC = ProjectMetadata(
+            name = "dep-c",
+            fullyQualifiedName = ":dep-c",
+            dependencies = listOf(sharedDep),
+            changedFiles = emptyList()
+        )
+
+        val root = ProjectMetadata(
+            name = "root",
+            fullyQualifiedName = ":root",
+            dependencies = listOf(depB, depC),
+            changedFiles = emptyList()
+        )
+
+        // then
+        root.hasChanges() shouldBe false
+    }
+
     test("toString includes dependency count and file count") {
         // given
         val dep1 = ProjectMetadata("dep1", ":dep1")

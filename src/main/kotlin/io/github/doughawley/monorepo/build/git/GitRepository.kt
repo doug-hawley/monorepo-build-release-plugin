@@ -104,7 +104,11 @@ open class GitRepository(
         if (result.success) {
             return true
         }
-        if (result.errorOutput.contains("couldn't find remote ref")) {
+        // Exit code 128 is used for both "missing ref" and "unreachable remote".
+        // When the ref is missing, git includes the tag name in the error
+        // (e.g., "couldn't find remote ref refs/tags/<tagName>") regardless
+        // of locale. Transport/auth errors do not mention the tag name.
+        if (result.exitCode == 128 && result.errorOutput.contains(tagName)) {
             return false
         }
         throw RuntimeException(

@@ -18,9 +18,10 @@ class LastSuccessfulBuildTagUpdater(
      * Updates the tag to point at HEAD and pushes it to the remote.
      *
      * @param tagName the tag to update (e.g., "monorepo/last-successful-build")
+     * @return true if the tag was pushed to the remote, false if the push failed
      * @throws RuntimeException if the local tag creation fails
      */
-    fun updateTag(tagName: String) {
+    fun updateTag(tagName: String): Boolean {
         // Force-create tag locally at HEAD
         val tagResult = executor.execute(rootDir, "tag", "-f", tagName, "HEAD")
         if (!tagResult.success) {
@@ -38,8 +39,9 @@ class LastSuccessfulBuildTagUpdater(
                 "The build succeeded but the tag was not pushed. " +
                 "The next build may re-process already-built changes."
             )
-            return
+            return false
         }
         logger.lifecycle("Pushed tag '$tagName' to remote")
+        return true
     }
 }
