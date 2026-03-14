@@ -84,9 +84,14 @@ class MonorepoBuildReleasePlugin @Inject constructor(
                     if (resolvedRef != null) {
                         val resolvedCommit = gitRepository.resolveCommit(resolvedRef)
                         rootBuildExtension.resolvedBaseCommit = resolvedCommit
-                        project.logger.lifecycle("Change detection baseline: $resolvedRef ($resolvedCommit)")
-                    } else {
-                        project.logger.lifecycle("Change detection baseline: none (all projects treated as changed)")
+                    }
+
+                    if (isChangeDetectionRun(project)) {
+                        if (resolvedRef != null) {
+                            project.logger.lifecycle("Change detection baseline: $resolvedRef (${rootBuildExtension.resolvedBaseCommit})")
+                        } else {
+                            project.logger.lifecycle("Change detection baseline: none (all projects treated as changed)")
+                        }
                     }
 
                     computeMetadata(project.rootProject, rootBuildExtension, resolvedRef)
@@ -267,6 +272,19 @@ class MonorepoBuildReleasePlugin @Inject constructor(
             "All projects will be treated as changed."
         )
         return null
+    }
+
+    /**
+     * Returns true if the requested tasks include a change-detection task
+     * whose output benefits from a visible baseline log message.
+     */
+    private fun isChangeDetectionRun(project: Project): Boolean {
+        val changeDetectionTasks = setOf(
+            "printChangedProjects", ":printChangedProjects",
+            "buildChangedProjects", ":buildChangedProjects",
+            "createReleaseBranches", ":createReleaseBranches"
+        )
+        return project.gradle.startParameter.taskNames.any { it in changeDetectionTasks }
     }
 
     /**
