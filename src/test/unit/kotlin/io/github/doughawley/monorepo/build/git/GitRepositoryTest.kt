@@ -17,7 +17,7 @@ class GitRepositoryTest : FunSpec({
 
     beforeEach {
         repoDir = Files.createTempDirectory("test-git-repo").toFile()
-        git(repoDir, "init")
+        git(repoDir, "init", "-b", "main")
         git(repoDir, "config", "user.email", "test@example.com")
         git(repoDir, "config", "user.name", "Test User")
         File(repoDir, "initial.txt").writeText("initial content")
