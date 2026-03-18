@@ -95,6 +95,16 @@ class MonorepoBuildReleasePlugin @Inject constructor(
                     }
 
                     computeMetadata(project.rootProject, rootBuildExtension, resolvedRef)
+
+                    if (isChangeDetectionRun(project)) {
+                        val affectedProjects = rootBuildExtension.allAffectedProjects
+                        if (affectedProjects.isEmpty()) {
+                            project.logger.lifecycle("No projects have changed - nothing to build")
+                        } else {
+                            project.logger.lifecycle("Affected projects: ${affectedProjects.joinToString(", ")}")
+                        }
+                    }
+
                     wireDependsOn(project, "buildChangedProjects", rootBuildExtension.allAffectedProjects)
                     rootBuildExtension.metadataComputed = true
                     project.logger.debug("Changed project metadata computed successfully in configuration phase")
@@ -129,12 +139,6 @@ class MonorepoBuildReleasePlugin @Inject constructor(
                         "or an error occurred during project evaluation. " +
                         "Re-run with --info or --debug for more details."
                     )
-                }
-                val changedProjects = ext.allAffectedProjects
-                if (changedProjects.isEmpty()) {
-                    logger.lifecycle("No projects have changed - nothing to build")
-                } else {
-                    logger.lifecycle("Building changed projects: ${changedProjects.joinToString(", ")}")
                 }
             }
         }
