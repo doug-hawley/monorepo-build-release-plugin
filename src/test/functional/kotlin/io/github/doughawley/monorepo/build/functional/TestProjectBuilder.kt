@@ -323,7 +323,7 @@ fun BuildResult.extractDirectlyChangedProjects(): Set<String> {
 }
 
 fun BuildResult.extractBuiltProjects(): Set<String> {
-    val regex = """Building changed projects: (.*)""".toRegex()
+    val regex = """Affected projects: (.*)""".toRegex()
     val match = regex.find(output)
     val projectsString = match?.groupValues?.get(1)?.trim() ?: ""
 
