@@ -73,7 +73,7 @@ Builds all affected projects (including transitive dependents). Useful for PR va
 ./gradlew buildChangedProjects
 ```
 
-> **Note:** `buildChangedProjects` does not update the last-successful-build tag or create release branches. Use `createReleaseBranches` for post-merge CI workflows. `createReleaseBranches` depends on `buildChangedProjects`, so all affected projects are built first automatically.
+> **Note:** `buildChangedProjects` does not update the last-successful-build tag or create release branches. Use `createReleaseBranchesForChangedProjects` for post-merge CI workflows. `createReleaseBranchesForChangedProjects` depends on `buildChangedProjects`, so all affected projects are built first automatically.
 
 ### Releases
 
@@ -113,12 +113,12 @@ monorepo {
 }
 ```
 
-#### `createReleaseBranches`
+#### `createReleaseBranchesForChangedProjects`
 
 The CI post-merge task. Depends on `buildChangedProjects` to build all affected projects first, then creates release branches atomically for opted-in projects and updates the last-successful-build tag. Fails fast if the current branch is not `primaryBranch`.
 
 ```bash
-./gradlew createReleaseBranches
+./gradlew createReleaseBranchesForChangedProjects
 ```
 
 Release branches are created using a two-phase atomic approach: all branches are created locally first, then pushed together via `git push --atomic`. If any step fails, all local branches are rolled back and the tag is not updated.
@@ -210,7 +210,7 @@ Then build everything affected to verify it compiles before opening the PR:
 The PR is merged into `main` and CI triggers on the merge commit. The plugin compares HEAD against the `monorepo/last-successful-build` tag to find what changed since the last green build:
 
 ```bash
-./gradlew createReleaseBranches
+./gradlew createReleaseBranchesForChangedProjects
 ```
 
 `:shared-module` changed, so both apps are included via transitive impact. `:shared-module` itself is skipped because it isn't opted in to releases. The task builds all affected projects, creates release branches atomically, and updates the tag — all in one step.
@@ -251,7 +251,7 @@ The plugin detects it is on a release branch and applies a patch bump. Tag `rele
 
 | Property | Type | Default | Description |
 |----------|------|---------|-------------|
-| `primaryBranch` | String | `"main"` | Main integration branch; used as fallback ref (`origin/{primaryBranch}`) when the tag doesn't exist, and as branch guard for `createReleaseBranches` |
+| `primaryBranch` | String | `"main"` | Main integration branch; used as fallback ref (`origin/{primaryBranch}`) when the tag doesn't exist, and as branch guard for `createReleaseBranchesForChangedProjects` |
 
 ### `monorepo { build { } }`
 
