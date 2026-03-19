@@ -4,6 +4,18 @@ All notable changes to this project will be documented in this file.
 
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.3.9](https://github.com/doug-hawley/monorepo-build-release-plugin/compare/v0.3.8...v0.3.9) (2026-03-19)
+
+
+### Bug Fixes
+
+* log affected projects during configuration phase instead of doLast ([#145](https://github.com/doug-hawley/monorepo-build-release-plugin/issues/145)) ([4ddac16](https://github.com/doug-hawley/monorepo-build-release-plugin/commit/4ddac1643cdadb3d8ca924df321d3aef626e714f))
+
+
+### Code Refactoring
+
+* rename createReleaseBranches task to createReleaseBranchesForChangedProjects ([13b7077](https://github.com/doug-hawley/monorepo-build-release-plugin/commit/13b7077108de7c6d606cc2cd08226a4ea2614912))
+
 ## [0.3.8](https://github.com/doug-hawley/monorepo-build-release-plugin/compare/v0.3.7...v0.3.8) (2026-03-14)
 
 
