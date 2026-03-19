@@ -145,7 +145,7 @@ class MonorepoBuildReleasePlugin @Inject constructor(
 
         // ── Aggregate release task ────────────────────────────────────────────
 
-        project.tasks.register("createReleaseBranches").configure {
+        project.tasks.register("createReleaseBranchesForChangedProjects").configure {
             group = RELEASE_TASK_GROUP
             description = "Creates release branches for changed projects"
             dependsOn("buildChangedProjects")
@@ -167,7 +167,7 @@ class MonorepoBuildReleasePlugin @Inject constructor(
                 val currentBranch = releaseExecutor.currentBranch()
                 if (currentBranch != ext.primaryBranch) {
                     throw GradleException(
-                        "createReleaseBranches must run on '${ext.primaryBranch}', " +
+                        "createReleaseBranchesForChangedProjects must run on '${ext.primaryBranch}', " +
                         "but the current branch is '$currentBranch'."
                     )
                 }
@@ -227,7 +227,7 @@ class MonorepoBuildReleasePlugin @Inject constructor(
      * Resolves the base ref for change detection.
      *
      * The baseline depends on which task the user requested:
-     * - If `createReleaseBranches` is requested (CI release build) →
+     * - If `createReleaseBranchesForChangedProjects` is requested (CI release build) →
      *   fetch the last-successful-build tag from origin (many CI environments
      *   do not fetch tags by default), then use it; if the tag does not exist,
      *   return null so all projects are treated as changed (the first build on
@@ -245,8 +245,8 @@ class MonorepoBuildReleasePlugin @Inject constructor(
 
         val requestedTasks = project.gradle.startParameter.taskNames
         val isReleaseRun = requestedTasks.any { taskName ->
-            taskName == "createReleaseBranches" ||
-            taskName == ":createReleaseBranches"
+            taskName == "createReleaseBranchesForChangedProjects" ||
+            taskName == ":createReleaseBranchesForChangedProjects"
         }
 
         if (isReleaseRun) {
@@ -286,7 +286,7 @@ class MonorepoBuildReleasePlugin @Inject constructor(
         val changeDetectionTasks = setOf(
             "printChangedProjects", ":printChangedProjects",
             "buildChangedProjects", ":buildChangedProjects",
-            "createReleaseBranches", ":createReleaseBranches"
+            "createReleaseBranchesForChangedProjects", ":createReleaseBranchesForChangedProjects"
         )
         return project.gradle.startParameter.taskNames.any { it in changeDetectionTasks }
     }
