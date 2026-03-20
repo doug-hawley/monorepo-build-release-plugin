@@ -131,7 +131,8 @@ abstract class ReleaseTask : DefaultTask() {
         val versionFile = buildDir.file("release-version.txt").get().asFile
         versionFile.parentFile.mkdirs()
         versionFile.writeText(nextVersion.toString())
-        logger.lifecycle("Wrote release version to: ${versionFile.absolutePath}")
+        val relativePath = project.rootDir.toPath().relativize(versionFile.toPath())
+        logger.lifecycle("Wrote release version to: $relativePath")
     }
 
     private fun resolveScope(): Scope {
