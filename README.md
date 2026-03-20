@@ -7,7 +7,7 @@ A Gradle plugin for multi-module projects that uses git history to detect which 
 ## Key Features
 
 - **Gradle-native dependency tracking** — changed project detection reads your existing Gradle project dependencies directly; no separate dependency map to define or maintain
-- **Tag-based change detection** — compare against a `monorepo/last-successful-build` tag that only moves on green builds; failed builds automatically include their changes in the next run
+- **Tag-based change detection** — CI release builds compare against a `monorepo/last-successful-build` tag that only moves on green builds; failed builds automatically include their changes in the next run. Dev and PR builds compare against `origin/{primaryBranch}`
 - **Transitive impact analysis** — projects that depend on a changed project are automatically included
 - **Selective builds** — run builds and tests only for affected projects, reducing CI time in large monorepos
 - **Per-project versioning** — each subproject gets its own semantic version tag; only changed projects are released
@@ -28,7 +28,7 @@ plugins {
 
 ```kotlin
 monorepo {
-    primaryBranch = "main"              // main integration branch; used as fallback ref; defaults to "main"
+    primaryBranch = "main"              // main integration branch; used as baseline ref for dev/PR builds; defaults to "main"
 
     build {
         lastSuccessfulBuildTag = "monorepo/last-successful-build"  // tag name for change detection anchor; defaults shown
@@ -41,7 +41,10 @@ monorepo {
 }
 ```
 
-The plugin detects changes by comparing HEAD against the `lastSuccessfulBuildTag`. If the tag doesn't exist (e.g., first run), it falls back to `origin/{primaryBranch}`.
+The plugin detects changes by comparing HEAD against a baseline ref. The baseline depends on the task:
+
+- **CI release builds** (`createReleaseBranchesForChangedProjects`): uses the `lastSuccessfulBuildTag`. If the tag doesn't exist (e.g., first run), all projects are treated as changed.
+- **Dev and PR builds** (all other tasks): uses `origin/{primaryBranch}`. If the remote branch isn't available, all projects are treated as changed.
 
 Individual subprojects can declare their own exclude patterns using the `monorepoProject` extension. Patterns are matched against paths relative to the subproject directory and are applied after global `excludePatterns`.
 
@@ -56,6 +59,8 @@ monorepoProject {
     }
 }
 ```
+
+### Tasks
 
 #### `printChangedProjects`
 
@@ -79,7 +84,7 @@ Builds all affected projects (including transitive dependents). Useful for PR va
 
 Each subproject manages its own semantic version using git tags of the form `{globalTagPrefix}/{projectPrefix}/v{version}` (e.g. `release/api/v1.2.0`). Release is opt-in per subproject.
 
-#### Opting in a subproject
+### Opting in a subproject
 
 In each subproject's `build.gradle.kts`:
 
@@ -102,7 +107,7 @@ monorepoProject {
 }
 ```
 
-#### Global configuration
+### Global configuration
 
 ```kotlin
 monorepo {
@@ -112,6 +117,8 @@ monorepo {
     }
 }
 ```
+
+### Tasks
 
 #### `createReleaseBranchesForChangedProjects`
 
@@ -133,7 +140,7 @@ Releases a single subproject from its release branch. Must be run from a matchin
 
 The task will fail if run from `main`, a feature branch, or a release branch belonging to a different project.
 
-#### Versioning rules
+### Versioning rules
 
 - Release branches follow the pattern `{globalTagPrefix}/{projectPrefix}/v{major}.{minor}.x`
 - The first release on a new branch (e.g., `release/api/v0.1.x`) creates `v0.1.0`
@@ -170,12 +177,24 @@ This walkthrough uses a three-project monorepo to show how the build and release
 // shared-module/build.gradle.kts — no monorepoProject block; release is opt-in
 
 // app1/build.gradle.kts
-dependencies { implementation(project(":shared-module")) }
-monorepoProject { release { enabled = true } }
+dependencies {
+    implementation(project(":shared-module"))
+}
+monorepoProject {
+    release {
+        enabled = true
+    }
+}
 
 // app2/build.gradle.kts
-dependencies { implementation(project(":shared-module")) }
-monorepoProject { release { enabled = true } }
+dependencies {
+    implementation(project(":shared-module"))
+}
+monorepoProject {
+    release {
+        enabled = true
+    }
+}
 ```
 
 `:shared-module` is an internal module consumed by both apps. It participates in change detection and build impact analysis, but the team doesn't publish it directly — only `:app1` and `:app2` are released.
@@ -231,7 +250,12 @@ A separate CI/CD pipeline configured to trigger on pushes to `release/**` branch
 ./gradlew :app2:release   # creates tag release/app2/v0.1.0, writes release-version.txt
 ```
 
-Wire your publish step to the `postRelease` lifecycle hook so it runs automatically after tagging.
+Wire your publish step to the `postRelease` lifecycle hook so it runs automatically after tagging. Alternatively, the `release` task writes the released version to `build/release-version.txt`, which your CI/CD pipeline can read to determine the version for publishing:
+
+```bash
+VERSION=$(cat app1/build/release-version.txt)
+./publish.sh --version "$VERSION"
+```
 
 > **Tip:** If a build fails, the tag stays at the last green state. The next successful build will automatically pick up all changes since then — nothing is lost.
 
@@ -245,13 +269,126 @@ A bug is found in `:app1` after `v0.1.0`. A developer checks out `release/app1/v
 
 The plugin detects it is on a release branch and applies a patch bump. Tag `release/app1/v0.1.1` is created; no new release branch is created, and `:app2` and `:shared-module` are untouched.
 
+## CI/CD Configuration
+
+The plugin pushes git refs (release branches and the last-successful-build tag) during task execution. These pushes can interact with your CI/CD platform's trigger rules in unexpected ways. The sections below cover platform-specific configuration to avoid recursive triggers and ensure release workflows run correctly.
+
+### Vela
+
+#### Pipeline for `main` (post-merge builds)
+
+Configure your main branch pipeline to run `createReleaseBranchesForChangedProjects` on pushes to `main`:
+
+```yaml
+steps:
+  - name: build-and-release
+    image: gradle:jdk17
+    commands:
+      - ./gradlew createReleaseBranchesForChangedProjects
+
+metadata:
+  template: false
+
+ruleset:
+  event: push
+  branch: main
+```
+
+> **Warning:** The `createReleaseBranchesForChangedProjects` task force-pushes the `monorepo/last-successful-build` tag on every run. If your pipeline triggers on **all** tag events, this will create an infinite loop: task pushes tag → Vela triggers build → task pushes tag → repeat.
+>
+> Ensure your tag-triggered pipelines filter to version-pattern tags only (e.g., `v*`), not all tags.
+
+#### Pipeline for release branches
+
+Configure a separate pipeline to run the per-project release task when a release branch is pushed:
+
+```yaml
+steps:
+  - name: release
+    image: gradle:jdk17
+    commands:
+      - ./gradlew :${VELA_REPO_BRANCH_PROJECT}:release
+
+metadata:
+  template: false
+
+ruleset:
+  event: push
+  branch: release/*
+```
+
+> **Warning:** The release branches pushed by `createReleaseBranchesForChangedProjects` will trigger this pipeline. Make sure the release pipeline does **not** also run `createReleaseBranchesForChangedProjects`, or you will get recursive triggers.
+
+#### Tag-triggered pipelines
+
+If you have pipelines that trigger on tag events (e.g., for publishing artifacts after a release tag is created), scope the tag filter to exclude the last-successful-build tag:
+
+```yaml
+ruleset:
+  event: tag
+  tag: "release/*/v*"    # only version tags, not monorepo/last-successful-build
+```
+
+### GitHub Actions
+
+#### Workflow for `main` (post-merge builds)
+
+```yaml
+on:
+  push:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0    # full history needed for git diff and tag detection
+      - uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+      - run: ./gradlew createReleaseBranchesForChangedProjects
+```
+
+> **Warning:** GitHub Actions does **not** trigger workflows from pushes made with the default `GITHUB_TOKEN`. This is a deliberate safeguard against recursive workflows, but it means the release branches created by `createReleaseBranchesForChangedProjects` will **not** automatically trigger your release workflow.
+>
+> To trigger release branch workflows, use one of these approaches:
+> 1. **GitHub App token** — use a GitHub App installation token (e.g., via [`actions/create-github-app-token`](https://github.com/actions/create-github-app-token)) instead of `GITHUB_TOKEN` for the checkout step. Pushes made with this token will trigger downstream workflows.
+> 2. **`workflow_dispatch`** — add a `workflow_dispatch` trigger to your release workflow and dispatch it from the main workflow after branch creation.
+> 3. **Personal Access Token** — use a PAT with repo scope (less recommended for shared repositories).
+
+#### Workflow for release branches
+
+```yaml
+on:
+  push:
+    branches: ["release/**/v*.x"]
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+      - run: ./gradlew $(echo "${GITHUB_REF_NAME}" | sed 's|release/|:|;s|/v.*||'):release
+```
+
+This workflow will only trigger if pushes to release branches are made with a token that allows workflow triggering (see warning above).
+
 ## Configuration Reference
 
 ### `monorepo { }`
 
 | Property | Type | Default | Description |
 |----------|------|---------|-------------|
-| `primaryBranch` | String | `"main"` | Main integration branch; used as fallback ref (`origin/{primaryBranch}`) when the tag doesn't exist, and as branch guard for `createReleaseBranchesForChangedProjects` |
+| `primaryBranch` | String | `"main"` | Main integration branch; used as baseline ref (`origin/{primaryBranch}`) for dev and PR builds, and as branch guard for `createReleaseBranchesForChangedProjects` |
 
 ### `monorepo { build { } }`
 
@@ -294,8 +431,8 @@ Ensure you're running the task in a directory that's part of a git repository. T
 ### "Git diff command failed"
 
 This can happen if:
-- The `lastSuccessfulBuildTag` doesn't exist and the fallback `origin/{primaryBranch}` isn't available
-- You haven't fetched the remote branch (`git fetch origin`)
+- The baseline ref is not available — `origin/{primaryBranch}` for dev/PR builds, or the `lastSuccessfulBuildTag` for CI release builds
+- You haven't fetched the remote branch or tags (`git fetch origin`)
 - Git is not installed or not in the PATH
 
 Solution:
