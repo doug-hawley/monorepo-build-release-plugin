@@ -86,6 +86,54 @@ class AtomicReleaseBranchCreatorIntegrationTest : FunSpec({
         repoListener.repo.remoteBranchExists("release/app/v1.0.x") shouldBe true
     }
 
+    test("skips project whose release branch already exists on remote") {
+        // given: push release/app/v0.1.x to remote (simulates prior run)
+        val executor = GitCommandExecutor(logger)
+        val releaseExecutor = GitReleaseExecutor(repoListener.repo.localDir, executor, logger)
+        releaseExecutor.createBranchLocally("release/app/v0.1.x")
+        releaseExecutor.pushBranch("release/app/v0.1.x")
+        releaseExecutor.deleteLocalBranch("release/app/v0.1.x")
+
+        val creator = createCreator()
+        val projects = mapOf(
+            ":app" to "app",
+            ":lib" to "lib"
+        )
+
+        // when
+        val result = creator.createReleaseBranches(projects, "release", Scope.MINOR)
+
+        // then: app skipped, lib created
+        result.createdBranches shouldContainExactlyInAnyOrder listOf("release/lib/v0.1.x")
+        result.projectToBranch.keys shouldContainExactlyInAnyOrder listOf(":lib")
+        repoListener.repo.remoteBranchExists("release/lib/v0.1.x") shouldBe true
+    }
+
+    test("returns empty result when all release branches already exist on remote") {
+        // given: push release branches for both projects
+        val executor = GitCommandExecutor(logger)
+        val releaseExecutor = GitReleaseExecutor(repoListener.repo.localDir, executor, logger)
+        releaseExecutor.createBranchLocally("release/app/v0.1.x")
+        releaseExecutor.pushBranch("release/app/v0.1.x")
+        releaseExecutor.deleteLocalBranch("release/app/v0.1.x")
+        releaseExecutor.createBranchLocally("release/lib/v0.1.x")
+        releaseExecutor.pushBranch("release/lib/v0.1.x")
+        releaseExecutor.deleteLocalBranch("release/lib/v0.1.x")
+
+        val creator = createCreator()
+        val projects = mapOf(
+            ":app" to "app",
+            ":lib" to "lib"
+        )
+
+        // when
+        val result = creator.createReleaseBranches(projects, "release", Scope.MINOR)
+
+        // then
+        result.createdBranches.shouldBeEmpty()
+        result.projectToBranch.shouldBeEmpty()
+    }
+
     test("rolls back all local branches when one already exists locally") {
         // given: pre-create a branch for lib
         val executor = GitCommandExecutor(logger)

@@ -215,4 +215,33 @@ class GitReleaseExecutorTest : FunSpec({
         releaseExecutor.deleteLocalBranch("release/app/v1.0.x")
         verify { logger.warn(any()) }
     }
+
+    // branchExistsOnRemote
+
+    test("branchExistsOnRemote returns true when ls-remote returns output") {
+        // given
+        every { executor.executeSilently(rootDir, "ls-remote", "--heads", "origin", "release/app/v0.1.x") } returns
+            CommandResult(success = true, output = listOf("abc123\trefs/heads/release/app/v0.1.x"), exitCode = 0)
+
+        // when / then
+        releaseExecutor.branchExistsOnRemote("release/app/v0.1.x") shouldBe true
+    }
+
+    test("branchExistsOnRemote returns false when ls-remote returns empty output") {
+        // given
+        every { executor.executeSilently(rootDir, "ls-remote", "--heads", "origin", "release/app/v0.1.x") } returns
+            CommandResult(success = true, output = emptyList(), exitCode = 0)
+
+        // when / then
+        releaseExecutor.branchExistsOnRemote("release/app/v0.1.x") shouldBe false
+    }
+
+    test("branchExistsOnRemote returns false when command fails") {
+        // given
+        every { executor.executeSilently(rootDir, "ls-remote", "--heads", "origin", "release/app/v0.1.x") } returns
+            CommandResult(success = false, output = emptyList(), exitCode = 128, errorOutput = "remote error")
+
+        // when / then
+        releaseExecutor.branchExistsOnRemote("release/app/v0.1.x") shouldBe false
+    }
 })
