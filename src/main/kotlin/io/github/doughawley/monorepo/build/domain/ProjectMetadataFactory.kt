@@ -120,7 +120,8 @@ class ProjectMetadataFactory(private val logger: Logger) {
                         // object with endorseStrictVersions() and the Category.REGULAR_PLATFORM
                         // attribute set on it — it does not wrap it in a different type.
                         if (dep is ProjectDependency) {
-                            dependencies.add(dep.path)
+                            @Suppress("DEPRECATION")
+                            dependencies.add(dep.dependencyProject.path)
                         }
                     }
                 } catch (e: Exception) {
