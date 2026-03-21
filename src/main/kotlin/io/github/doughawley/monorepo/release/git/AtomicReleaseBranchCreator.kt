@@ -44,7 +44,27 @@ class AtomicReleaseBranchCreator(
             return ReleaseBranchResult(emptyList(), emptyMap())
         }
 
-        val projectToBranch = resolveReleaseBranches(projects, globalPrefix, scope)
+        val allResolved = resolveReleaseBranches(projects, globalPrefix, scope)
+
+        // Skip projects whose release branch already exists on the remote.
+        // This happens when a prior createReleaseBranches run succeeded but the
+        // subsequent release branch build did not run, so no version tag was created
+        // and the branch name resolves to the same value on the next run.
+        val projectToBranch = allResolved.filterNot { (projectPath, branch) ->
+            val exists = gitReleaseExecutor.branchExistsOnRemote(branch)
+            if (exists) {
+                logger.lifecycle(
+                    "Skipping $projectPath: release branch '$branch' already exists on remote"
+                )
+            }
+            exists
+        }
+
+        if (projectToBranch.isEmpty()) {
+            logger.lifecycle("All release branches already exist on remote — nothing to create")
+            return ReleaseBranchResult(emptyList(), emptyMap())
+        }
+
         val branchNames = projectToBranch.values.toList()
 
         // Phase 1: Create all branches locally

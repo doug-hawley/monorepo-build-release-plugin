@@ -93,4 +93,9 @@ class GitReleaseExecutor(
         val result = executor.execute(rootDir, "branch", "--list", branch)
         return result.success && result.output.isNotEmpty()
     }
+
+    fun branchExistsOnRemote(branch: String): Boolean {
+        val result = executor.executeSilently(rootDir, "ls-remote", "--heads", "origin", branch)
+        return result.success && result.output.isNotEmpty()
+    }
 }
