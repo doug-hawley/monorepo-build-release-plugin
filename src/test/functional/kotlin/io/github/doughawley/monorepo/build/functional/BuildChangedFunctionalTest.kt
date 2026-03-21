@@ -338,4 +338,31 @@ class BuildChangedFunctionalTest : FunSpec({
         val tagCommitAfter = project.getLastCommitSha("monorepo/last-successful-build")
         tagCommitAfter shouldBe tagCommitBefore
     }
+
+    // ─────────────────────────────────────────────────────────────
+    // Remote branch fetch (CI scenario)
+    // ─────────────────────────────────────────────────────────────
+
+    test("buildChanged fetches origin/main when not available locally") {
+        // given: project with remote, but remote-tracking ref deleted (simulates CI checkout)
+        val project = StandardTestProject.createAndInitialize(
+            testProjectListener.getTestProjectDir(),
+            withRemote = true
+        )
+
+        project.appendToFile(Files.APP2_SOURCE, "\n// Modified")
+        project.commitAll("Change app2")
+
+        // Delete the remote-tracking ref to simulate a CI checkout that only fetches the build ref
+        project.executeGitCommand("update-ref", "-d", "refs/remotes/origin/main")
+
+        // when
+        val result = project.runTask("buildChanged")
+
+        // then: plugin fetches origin/main and detects the change
+        result.task(":buildChanged")?.outcome shouldBe TaskOutcome.SUCCESS
+        result.output shouldContain "Change detection baseline: origin/main"
+        val built = result.extractBuiltProjects()
+        built shouldContain Projects.APP2
+    }
 })

@@ -261,6 +261,15 @@ class MonorepoBuildReleasePlugin : Plugin<Project> {
             return null
         }
 
+        if (!gitRepository.refExists(remoteBranch)) {
+            // Many CI environments (e.g. Vela) only fetch the ref being built,
+            // so the remote-tracking branch may not exist locally. Fetch it.
+            try {
+                gitRepository.fetchBranch("origin", primaryBranch)
+            } catch (e: Exception) {
+                project.logger.debug("Could not fetch '$primaryBranch' from origin: ${e.message}")
+            }
+        }
         if (gitRepository.refExists(remoteBranch)) {
             project.logger.debug("Using '$remoteBranch' as base ref")
             return remoteBranch
