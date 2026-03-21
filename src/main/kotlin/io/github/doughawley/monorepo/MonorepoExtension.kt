@@ -27,7 +27,7 @@ open class MonorepoExtension {
      * The primary integration branch name (e.g. "main", "master", "develop").
      * Used as fallback ref (`origin/<primaryBranch>`) when the last-successful-build tag
      * doesn't exist, and as the branch guard for CI tasks like
-     * `createReleaseBranches`.
+     * `prepareReleasesForChanged`.
      */
     var primaryBranch: String = "main"
 
