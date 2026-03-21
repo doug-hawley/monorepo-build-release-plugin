@@ -47,7 +47,7 @@ class AtomicReleaseBranchCreator(
         val allResolved = resolveReleaseBranches(projects, globalPrefix, scope)
 
         // Skip projects whose release branch already exists on the remote.
-        // This happens when a prior createReleaseBranches run succeeded but the
+        // This happens when a prior prepareReleasesForChanged run succeeded but the
         // subsequent release branch build did not run, so no version tag was created
         // and the branch name resolves to the same value on the next run.
         val projectToBranch = allResolved.filterNot { (projectPath, branch) ->

@@ -21,7 +21,7 @@ class BuildChangedProjectsTaskTest : FunSpec({
         task?.description shouldBe "Builds only the projects that have been affected by changes"
     }
 
-    test("createReleaseBranches task should be registered") {
+    test("prepareReleasesForChanged task should be registered") {
         // given
         val project = ProjectBuilder.builder().build()
 
@@ -29,9 +29,9 @@ class BuildChangedProjectsTaskTest : FunSpec({
         project.pluginManager.apply("io.github.doug-hawley.monorepo-build-release-plugin")
 
         // then
-        val task = project.tasks.findByName("createReleaseBranches")
+        val task = project.tasks.findByName("prepareReleasesForChanged")
         task shouldNotBe null
         task?.group shouldBe "monorepo"
-        task?.description shouldBe "Creates release branches for changed projects"
+        task?.description shouldBe "Prepares releases by creating release branches for changed projects"
     }
 })
