@@ -71,6 +71,7 @@ class MonorepoBuildReleasePlugin : Plugin<Project> {
         // computationGuard.compareAndSet(false, true) ensures only the first thread proceeds.
         project.gradle.projectsEvaluated {
             if (rootBuildExtension.computationGuard.compareAndSet(false, true)) {
+                validateGitPrerequisites(project.rootProject)
                 try {
                     val resolvedRef = resolveBaseRef(project.rootProject, rootExtension)
                     rootBuildExtension.resolvedBaseRef = resolvedRef
@@ -435,6 +436,32 @@ class MonorepoBuildReleasePlugin : Plugin<Project> {
                 val failure: Throwable? = state.failure
                 state.executed && failure == null
             }
+        }
+    }
+
+    /**
+     * Validates that git is installed and the project is inside a git repository.
+     * Called early in [apply] to produce clear error messages instead of letting
+     * opaque ProcessBuilder failures surface later during change detection.
+     */
+    private fun validateGitPrerequisites(project: Project) {
+        val executor = GitCommandExecutor(project.logger)
+        val versionResult = executor.executeSilently(project.rootDir, "--version")
+        if (!versionResult.success) {
+            throw GradleException(
+                "git is not installed or not on PATH. " +
+                "The monorepo-build-release-plugin requires git to detect changes. " +
+                "Install git and ensure it is available on your system PATH."
+            )
+        }
+
+        val gitRepository = GitRepository(project.rootDir, project.logger)
+        if (!gitRepository.isRepository()) {
+            throw GradleException(
+                "The project root '${project.rootDir}' is not inside a git repository. " +
+                "The monorepo-build-release-plugin requires a git repository to detect changes. " +
+                "Initialize a repository with 'git init'."
+            )
         }
     }
 }
