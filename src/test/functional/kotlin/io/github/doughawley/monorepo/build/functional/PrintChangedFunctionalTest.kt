@@ -12,9 +12,9 @@ import io.kotest.matchers.string.shouldContain
 import org.gradle.testkit.runner.TaskOutcome
 
 /**
- * Functional tests for the printChangedProjects task.
+ * Functional tests for the printChanged task.
  */
-class PrintChangedProjectsFunctionalTest : FunSpec({
+class PrintChangedFunctionalTest : FunSpec({
     val testProjectListener = extension(TestProjectListener())
 
     // --- Detection scenarios (formerly branch-mode) ---
@@ -26,10 +26,10 @@ class PrintChangedProjectsFunctionalTest : FunSpec({
         // when
         project.appendToFile(Files.COMMON_LIB_SOURCE, "\n// Added comment")
         project.commitAll("Change common-lib")
-        val result = project.runTask("printChangedProjects")
+        val result = project.runTask("printChanged")
 
         // then
-        result.task(":printChangedProjects")?.outcome shouldBe TaskOutcome.SUCCESS
+        result.task(":printChanged")?.outcome shouldBe TaskOutcome.SUCCESS
         val changedProjects = result.extractChangedProjects()
         changedProjects shouldHaveSize 5
         changedProjects shouldContainAll setOf(
@@ -51,10 +51,10 @@ class PrintChangedProjectsFunctionalTest : FunSpec({
         // when
         project.appendToFile(Files.MODULE1_SOURCE, "\n// Modified module1")
         project.commitAll("Change module1")
-        val result = project.runTask("printChangedProjects")
+        val result = project.runTask("printChanged")
 
         // then
-        result.task(":printChangedProjects")?.outcome shouldBe TaskOutcome.SUCCESS
+        result.task(":printChanged")?.outcome shouldBe TaskOutcome.SUCCESS
         val changedProjects = result.extractChangedProjects()
         changedProjects shouldHaveSize 2
         changedProjects shouldContainAll setOf(Projects.MODULE1, Projects.APP1)
@@ -67,10 +67,10 @@ class PrintChangedProjectsFunctionalTest : FunSpec({
         // when
         project.appendToFile(Files.MODULE2_SOURCE, "\n// Modified module2")
         project.commitAll("Change module2")
-        val result = project.runTask("printChangedProjects")
+        val result = project.runTask("printChanged")
 
         // then
-        result.task(":printChangedProjects")?.outcome shouldBe TaskOutcome.SUCCESS
+        result.task(":printChanged")?.outcome shouldBe TaskOutcome.SUCCESS
         val changedProjects = result.extractChangedProjects()
         changedProjects shouldHaveSize 3
         changedProjects shouldContainAll setOf(Projects.MODULE2, Projects.APP1, Projects.APP2)
@@ -83,10 +83,10 @@ class PrintChangedProjectsFunctionalTest : FunSpec({
         // when
         project.appendToFile(Files.APP1_SOURCE, "\n// Modified app")
         project.commitAll("Change app1")
-        val result = project.runTask("printChangedProjects")
+        val result = project.runTask("printChanged")
 
         // then
-        result.task(":printChangedProjects")?.outcome shouldBe TaskOutcome.SUCCESS
+        result.task(":printChanged")?.outcome shouldBe TaskOutcome.SUCCESS
         val changedProjects = result.extractChangedProjects()
         changedProjects shouldHaveSize 1
         changedProjects shouldContainAll setOf(Projects.APP1)
@@ -97,10 +97,10 @@ class PrintChangedProjectsFunctionalTest : FunSpec({
         val project = testProjectListener.createStandardProject()
 
         // when
-        val result = project.runTask("printChangedProjects")
+        val result = project.runTask("printChanged")
 
         // then
-        result.task(":printChangedProjects")?.outcome shouldBe TaskOutcome.SUCCESS
+        result.task(":printChanged")?.outcome shouldBe TaskOutcome.SUCCESS
         result.extractDirectlyChangedProjects() shouldBe emptySet()
         result.extractChangedProjects() shouldBe emptySet()
     }
@@ -113,10 +113,10 @@ class PrintChangedProjectsFunctionalTest : FunSpec({
         project.appendToFile(Files.APP1_SOURCE, "\n// Modified app1")
         project.appendToFile(Files.APP2_SOURCE, "\n// Modified app2")
         project.commitAll("Change both apps")
-        val result = project.runTask("printChangedProjects")
+        val result = project.runTask("printChanged")
 
         // then
-        result.task(":printChangedProjects")?.outcome shouldBe TaskOutcome.SUCCESS
+        result.task(":printChanged")?.outcome shouldBe TaskOutcome.SUCCESS
         val changedProjects = result.extractChangedProjects()
         changedProjects shouldHaveSize 2
         changedProjects shouldContainAll setOf(Projects.APP1, Projects.APP2)
@@ -135,10 +135,10 @@ class PrintChangedProjectsFunctionalTest : FunSpec({
             class NewFile
             """.trimIndent()
         )
-        val result = project.runTask("printChangedProjects")
+        val result = project.runTask("printChanged")
 
         // then
-        result.task(":printChangedProjects")?.outcome shouldBe TaskOutcome.SUCCESS
+        result.task(":printChanged")?.outcome shouldBe TaskOutcome.SUCCESS
         val changedProjects = result.extractChangedProjects()
         changedProjects shouldContainAll setOf(
             Projects.COMMON_LIB,
@@ -156,10 +156,10 @@ class PrintChangedProjectsFunctionalTest : FunSpec({
         // when
         project.appendToFile(Files.MODULE1_SOURCE, "\n// Staged change")
         project.stageFile(Files.MODULE1_SOURCE)
-        val result = project.runTask("printChangedProjects")
+        val result = project.runTask("printChanged")
 
         // then
-        result.task(":printChangedProjects")?.outcome shouldBe TaskOutcome.SUCCESS
+        result.task(":printChanged")?.outcome shouldBe TaskOutcome.SUCCESS
         val changedProjects = result.extractChangedProjects()
         changedProjects shouldContainAll setOf(Projects.MODULE1, Projects.APP1)
     }
@@ -171,10 +171,10 @@ class PrintChangedProjectsFunctionalTest : FunSpec({
         // when
         project.appendToFile(Files.MODULE2_BUILD, "\n// Build config change")
         project.commitAll("Change build config")
-        val result = project.runTask("printChangedProjects")
+        val result = project.runTask("printChanged")
 
         // then
-        result.task(":printChangedProjects")?.outcome shouldBe TaskOutcome.SUCCESS
+        result.task(":printChanged")?.outcome shouldBe TaskOutcome.SUCCESS
         val changedProjects = result.extractChangedProjects()
         changedProjects shouldContainAll setOf(Projects.MODULE2, Projects.APP1, Projects.APP2)
     }
@@ -186,7 +186,7 @@ class PrintChangedProjectsFunctionalTest : FunSpec({
         // when
         project.appendToFile(Files.MODULE2_SOURCE, "\n// Changed")
         project.commitAll("Change module2")
-        val result = project.runTask("printChangedProjects")
+        val result = project.runTask("printChanged")
 
         // then
         val changedProjects = result.extractChangedProjects()
@@ -204,10 +204,10 @@ class PrintChangedProjectsFunctionalTest : FunSpec({
         project.stageFile(Files.COMMON_LIB_SOURCE)
         project.appendToFile(Files.APP2_SOURCE, "\n// Staged app change")
         project.stageFile(Files.APP2_SOURCE)
-        val result = project.runTask("printChangedProjects")
+        val result = project.runTask("printChanged")
 
         // then
-        result.task(":printChangedProjects")?.outcome shouldBe TaskOutcome.SUCCESS
+        result.task(":printChanged")?.outcome shouldBe TaskOutcome.SUCCESS
         val changedProjects = result.extractChangedProjects()
         changedProjects shouldHaveSize 5
         changedProjects shouldContainAll setOf(
@@ -221,7 +221,7 @@ class PrintChangedProjectsFunctionalTest : FunSpec({
 
     // --- origin/main baseline scenarios ---
 
-    test("printChangedProjects detects directly changed project using origin/main baseline") {
+    test("printChanged detects directly changed project using origin/main baseline") {
         // given
         val project = StandardTestProject.createAndInitialize(
             testProjectListener.getTestProjectDir(),
@@ -233,15 +233,15 @@ class PrintChangedProjectsFunctionalTest : FunSpec({
         project.commitAll("Modify common-lib")
 
         // when
-        val result = project.runTask("printChangedProjects")
+        val result = project.runTask("printChanged")
 
         // then
-        result.task(":printChangedProjects")?.outcome shouldBe TaskOutcome.SUCCESS
+        result.task(":printChanged")?.outcome shouldBe TaskOutcome.SUCCESS
         val changed = result.extractChangedProjects()
         changed shouldContain Projects.COMMON_LIB
     }
 
-    test("printChangedProjects detects transitive dependents using origin/main baseline") {
+    test("printChanged detects transitive dependents using origin/main baseline") {
         // given
         val project = StandardTestProject.createAndInitialize(
             testProjectListener.getTestProjectDir(),
@@ -252,10 +252,10 @@ class PrintChangedProjectsFunctionalTest : FunSpec({
         project.commitAll("Modify common-lib")
 
         // when
-        val result = project.runTask("printChangedProjects")
+        val result = project.runTask("printChanged")
 
         // then
-        result.task(":printChangedProjects")?.outcome shouldBe TaskOutcome.SUCCESS
+        result.task(":printChanged")?.outcome shouldBe TaskOutcome.SUCCESS
         val changed = result.extractChangedProjects()
         changed shouldContainAll setOf(
             Projects.COMMON_LIB,
@@ -266,7 +266,7 @@ class PrintChangedProjectsFunctionalTest : FunSpec({
         )
     }
 
-    test("printChangedProjects only shows projects changed since origin/main") {
+    test("printChanged only shows projects changed since origin/main") {
         // given
         val project = StandardTestProject.createAndInitialize(
             testProjectListener.getTestProjectDir(),
@@ -283,17 +283,17 @@ class PrintChangedProjectsFunctionalTest : FunSpec({
         project.commitAll("Modify module1")
 
         // when: compare against origin/main — only module1 changes are newer
-        val result = project.runTask("printChangedProjects")
+        val result = project.runTask("printChanged")
 
         // then
-        result.task(":printChangedProjects")?.outcome shouldBe TaskOutcome.SUCCESS
+        result.task(":printChanged")?.outcome shouldBe TaskOutcome.SUCCESS
         val changed = result.extractChangedProjects()
         changed shouldContain Projects.MODULE1
         changed shouldContain Projects.APP1
         changed shouldNotContain Projects.COMMON_LIB
     }
 
-    test("printChangedProjects reports which ref was used in output header") {
+    test("printChanged reports which ref was used in output header") {
         // given
         val project = testProjectListener.createStandardProject()
 
@@ -301,10 +301,10 @@ class PrintChangedProjectsFunctionalTest : FunSpec({
         project.commitAll("Change module1")
 
         // when
-        val result = project.runTask("printChangedProjects")
+        val result = project.runTask("printChanged")
 
         // then
-        result.task(":printChangedProjects")?.outcome shouldBe TaskOutcome.SUCCESS
+        result.task(":printChanged")?.outcome shouldBe TaskOutcome.SUCCESS
         result.output shouldContain "Change detection baseline: origin/main ("
         result.output shouldContain "Changed projects (since origin/main @"
     }

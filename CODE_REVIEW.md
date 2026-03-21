@@ -35,7 +35,7 @@ Issues identified during code review. Severity: **high**, **medium**, **low**.
 - **Issue**: `projectDir.relativeTo(rootDir)` throws if a subproject's directory is outside the root, with no clear error message for the user.
 - **Status**: Fixed in `fix-medium-severity-issues` — wrapped in try-catch that rethrows with a descriptive message including the offending project path and directories.
 
-### 6. Confusing error message when metadata check fails in `buildChangedProjects`
+### 6. Confusing error message when metadata check fails in `buildChanged`
 - **File**: `src/main/kotlin/.../MonorepoChangedProjectsPlugin.kt` (lines 86–111)
 - **Issue**: If metadata computation was skipped or failed silently, the resulting `IllegalStateException` doesn't surface the root cause.
 - **Status**: Fixed in `fix-medium-severity-issues` — error message now lists likely causes and directs the user to re-run with `--info` or `--debug`.

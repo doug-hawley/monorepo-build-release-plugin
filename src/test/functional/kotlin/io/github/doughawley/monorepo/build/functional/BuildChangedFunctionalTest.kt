@@ -12,22 +12,22 @@ import io.kotest.matchers.string.shouldContain
 import org.gradle.testkit.runner.TaskOutcome
 
 /**
- * Functional tests for the buildChangedProjects task.
+ * Functional tests for the buildChanged task.
  */
-class BuildChangedProjectsFunctionalTest : FunSpec({
+class BuildChangedFunctionalTest : FunSpec({
     val testProjectListener = extension(TestProjectListener())
 
-    test("buildChangedProjects task builds only affected projects") {
+    test("buildChanged task builds only affected projects") {
         // given
         val project = testProjectListener.createStandardProject()
         project.appendToFile(Files.COMMON_LIB_SOURCE, "\n// Modified")
         project.commitAll("Change common-lib")
 
         // when
-        val result = project.runTask("buildChangedProjects")
+        val result = project.runTask("buildChanged")
 
         // then
-        result.task(":buildChangedProjects")?.outcome shouldBe TaskOutcome.SUCCESS
+        result.task(":buildChanged")?.outcome shouldBe TaskOutcome.SUCCESS
         val builtProjects = result.extractBuiltProjects()
         builtProjects shouldContainAll setOf(
             Projects.COMMON_LIB,
@@ -38,35 +38,35 @@ class BuildChangedProjectsFunctionalTest : FunSpec({
         )
     }
 
-    test("buildChangedProjects builds only affected apps when module changes") {
+    test("buildChanged builds only affected apps when module changes") {
         // given
         val project = testProjectListener.createStandardProject()
         project.appendToFile(Files.MODULE1_SOURCE, "\n// Modified")
         project.commitAll("Change module1")
 
         // when
-        val result = project.runTask("buildChangedProjects")
+        val result = project.runTask("buildChanged")
 
         // then
-        result.task(":buildChangedProjects")?.outcome shouldBe TaskOutcome.SUCCESS
+        result.task(":buildChanged")?.outcome shouldBe TaskOutcome.SUCCESS
         val builtProjects = result.extractBuiltProjects()
         builtProjects shouldContainAll setOf(Projects.MODULE1, Projects.APP1)
         builtProjects shouldNotContain Projects.APP2
     }
 
-    test("buildChangedProjects reports no changes when nothing modified") {
+    test("buildChanged reports no changes when nothing modified") {
         // given
         val project = testProjectListener.createStandardProject()
 
         // when
-        val result = project.runTask("buildChangedProjects")
+        val result = project.runTask("buildChanged")
 
         // then
-        result.task(":buildChangedProjects")?.outcome shouldBe TaskOutcome.SUCCESS
+        result.task(":buildChanged")?.outcome shouldBe TaskOutcome.SUCCESS
         result.output shouldContain "No projects have changed - nothing to build"
     }
 
-    test("buildChangedProjects handles multiple independent app changes") {
+    test("buildChanged handles multiple independent app changes") {
         // given
         val project = testProjectListener.createStandardProject()
         project.appendToFile(Files.APP1_SOURCE, "\n// Modified A")
@@ -74,39 +74,39 @@ class BuildChangedProjectsFunctionalTest : FunSpec({
         project.commitAll("Change both apps")
 
         // when
-        val result = project.runTask("buildChangedProjects")
+        val result = project.runTask("buildChanged")
 
         // then
-        result.task(":buildChangedProjects")?.outcome shouldBe TaskOutcome.SUCCESS
+        result.task(":buildChanged")?.outcome shouldBe TaskOutcome.SUCCESS
         val builtProjects = result.extractBuiltProjects()
         builtProjects shouldContainAll setOf(Projects.APP1, Projects.APP2)
     }
 
-    test("buildChangedProjects succeeds without running printChangedProjects") {
+    test("buildChanged succeeds without running printChanged") {
         // given
         val project = testProjectListener.createStandardProject()
         project.appendToFile(Files.MODULE2_SOURCE, "\n// Changed")
         project.commitAll("Change module2")
 
         // when
-        val result = project.runTask("buildChangedProjects")
+        val result = project.runTask("buildChanged")
 
         // then
-        result.task(":buildChangedProjects")?.outcome shouldBe TaskOutcome.SUCCESS
-        result.task(":printChangedProjects") shouldBe null
+        result.task(":buildChanged")?.outcome shouldBe TaskOutcome.SUCCESS
+        result.task(":printChanged") shouldBe null
     }
 
-    test("buildChangedProjects builds only leaf project when changed") {
+    test("buildChanged builds only leaf project when changed") {
         // given
         val project = testProjectListener.createStandardProject()
         project.appendToFile(Files.APP2_SOURCE, "\n// App changed")
         project.commitAll("Change app2")
 
         // when
-        val result = project.runTask("buildChangedProjects")
+        val result = project.runTask("buildChanged")
 
         // then
-        result.task(":buildChangedProjects")?.outcome shouldBe TaskOutcome.SUCCESS
+        result.task(":buildChanged")?.outcome shouldBe TaskOutcome.SUCCESS
         val builtProjects = result.extractBuiltProjects()
         builtProjects shouldContain Projects.APP2
         builtProjects shouldNotContain Projects.COMMON_LIB
@@ -115,17 +115,17 @@ class BuildChangedProjectsFunctionalTest : FunSpec({
         builtProjects shouldNotContain Projects.APP1
     }
 
-    test("buildChangedProjects builds projects affected by BOM changes") {
+    test("buildChanged builds projects affected by BOM changes") {
         // given
         val project = testProjectListener.createStandardProject()
         project.appendToFile(Files.PLATFORM_BUILD, "\n// BOM version bump")
         project.commitAll("Bump BOM version")
 
         // when
-        val result = project.runTask("buildChangedProjects")
+        val result = project.runTask("buildChanged")
 
         // then
-        result.task(":buildChangedProjects")?.outcome shouldBe TaskOutcome.SUCCESS
+        result.task(":buildChanged")?.outcome shouldBe TaskOutcome.SUCCESS
         val builtProjects = result.extractBuiltProjects()
         builtProjects shouldContainAll setOf(
             Projects.PLATFORM,
@@ -144,10 +144,10 @@ class BuildChangedProjectsFunctionalTest : FunSpec({
         project.commitAll("Update BOM")
 
         // when
-        val result = project.runTask("printChangedProjects")
+        val result = project.runTask("printChanged")
 
         // then
-        result.task(":printChangedProjects")?.outcome shouldBe TaskOutcome.SUCCESS
+        result.task(":printChanged")?.outcome shouldBe TaskOutcome.SUCCESS
         val changedProjects = result.extractChangedProjects()
         changedProjects shouldHaveSize 6
         changedProjects shouldContainAll setOf(
@@ -171,10 +171,10 @@ class BuildChangedProjectsFunctionalTest : FunSpec({
         project.commitAll("Update BOM and common-lib")
 
         // when
-        val result = project.runTask("printChangedProjects")
+        val result = project.runTask("printChanged")
 
         // then
-        result.task(":printChangedProjects")?.outcome shouldBe TaskOutcome.SUCCESS
+        result.task(":printChanged")?.outcome shouldBe TaskOutcome.SUCCESS
         val changedProjects = result.extractChangedProjects()
         changedProjects shouldHaveSize 6
         changedProjects shouldContainAll setOf(
@@ -187,7 +187,7 @@ class BuildChangedProjectsFunctionalTest : FunSpec({
         )
     }
 
-    test("buildChangedProjects logs the change detection baseline") {
+    test("buildChanged logs the change detection baseline") {
         // given
         val project = StandardTestProject.createAndInitialize(
             testProjectListener.getTestProjectDir(),
@@ -198,16 +198,16 @@ class BuildChangedProjectsFunctionalTest : FunSpec({
         project.commitAll("Modify app2")
 
         // when
-        val result = project.runTask("buildChangedProjects")
+        val result = project.runTask("buildChanged")
 
         // then
-        result.task(":buildChangedProjects")?.outcome shouldBe TaskOutcome.SUCCESS
+        result.task(":buildChanged")?.outcome shouldBe TaskOutcome.SUCCESS
         result.output shouldContain "Change detection baseline: origin/main ("
     }
 
     // --- origin/main baseline scenarios ---
 
-    test("buildChangedProjects uses origin/main as baseline and detects direct change") {
+    test("buildChanged uses origin/main as baseline and detects direct change") {
         // given
         val project = StandardTestProject.createAndInitialize(
             testProjectListener.getTestProjectDir(),
@@ -218,17 +218,17 @@ class BuildChangedProjectsFunctionalTest : FunSpec({
         project.commitAll("Modify app2")
 
         // when
-        val result = project.runTask("buildChangedProjects")
+        val result = project.runTask("buildChanged")
 
         // then
-        result.task(":buildChangedProjects")?.outcome shouldBe TaskOutcome.SUCCESS
+        result.task(":buildChanged")?.outcome shouldBe TaskOutcome.SUCCESS
         val built = result.extractBuiltProjects()
         built shouldContain Projects.APP2
         built shouldNotContain Projects.COMMON_LIB
         built shouldNotContain Projects.MODULE1
     }
 
-    test("buildChangedProjects uses origin/main as baseline and detects transitive dependents") {
+    test("buildChanged uses origin/main as baseline and detects transitive dependents") {
         // given
         val project = StandardTestProject.createAndInitialize(
             testProjectListener.getTestProjectDir(),
@@ -239,10 +239,10 @@ class BuildChangedProjectsFunctionalTest : FunSpec({
         project.commitAll("Modify common-lib")
 
         // when
-        val result = project.runTask("buildChangedProjects")
+        val result = project.runTask("buildChanged")
 
         // then
-        result.task(":buildChangedProjects")?.outcome shouldBe TaskOutcome.SUCCESS
+        result.task(":buildChanged")?.outcome shouldBe TaskOutcome.SUCCESS
         val built = result.extractBuiltProjects()
         built shouldContainAll setOf(
             Projects.COMMON_LIB,
@@ -253,7 +253,7 @@ class BuildChangedProjectsFunctionalTest : FunSpec({
         )
     }
 
-    test("buildChangedProjects reports no changes when nothing changed since origin/main") {
+    test("buildChanged reports no changes when nothing changed since origin/main") {
         // given: origin/main at HEAD, no changes
         val project = StandardTestProject.createAndInitialize(
             testProjectListener.getTestProjectDir(),
@@ -261,15 +261,15 @@ class BuildChangedProjectsFunctionalTest : FunSpec({
         )
 
         // when
-        val result = project.runTask("buildChangedProjects")
+        val result = project.runTask("buildChanged")
 
         // then
-        result.task(":buildChangedProjects")?.outcome shouldBe TaskOutcome.SUCCESS
+        result.task(":buildChanged")?.outcome shouldBe TaskOutcome.SUCCESS
         result.output shouldContain "No projects have changed - nothing to build"
     }
 
-    test("buildChangedProjects ignores last-successful-build tag and uses origin/main") {
-        // given: tag exists but buildChangedProjects should use origin/main instead
+    test("buildChanged ignores last-successful-build tag and uses origin/main") {
+        // given: tag exists but buildChanged should use origin/main instead
         val project = StandardTestProject.createAndInitialize(
             testProjectListener.getTestProjectDir(),
             withRemote = true
@@ -286,16 +286,16 @@ class BuildChangedProjectsFunctionalTest : FunSpec({
         project.commitAll("Change module1")
 
         // when
-        val result = project.runTask("buildChangedProjects")
+        val result = project.runTask("buildChanged")
 
         // then: uses origin/main (initial commit), so both changes are detected
-        result.task(":buildChangedProjects")?.outcome shouldBe TaskOutcome.SUCCESS
+        result.task(":buildChanged")?.outcome shouldBe TaskOutcome.SUCCESS
         val built = result.extractBuiltProjects()
         built shouldContain Projects.APP2
         built shouldContain Projects.MODULE1
     }
 
-    test("buildChangedProjects treats all projects as changed when no baseline is available") {
+    test("buildChanged treats all projects as changed when no baseline is available") {
         // given: project without remote and no tag
         val project = StandardTestProject.createAndInitialize(
             testProjectListener.getTestProjectDir(),
@@ -303,10 +303,10 @@ class BuildChangedProjectsFunctionalTest : FunSpec({
         )
 
         // when
-        val result = project.runTask("buildChangedProjects")
+        val result = project.runTask("buildChanged")
 
         // then: no origin/main — no baseline exists
-        result.task(":buildChangedProjects")?.outcome shouldBe TaskOutcome.SUCCESS
+        result.task(":buildChanged")?.outcome shouldBe TaskOutcome.SUCCESS
         result.output shouldContain "no baseline"
         result.output shouldContain "Change detection baseline: none"
         val built = result.extractBuiltProjects()
@@ -315,8 +315,8 @@ class BuildChangedProjectsFunctionalTest : FunSpec({
         built shouldContain Projects.COMMON_LIB
     }
 
-    test("buildChangedProjects does not update the last-successful-build tag") {
-        // given: tag created by createAndInitialize, make a change, run buildChangedProjects
+    test("buildChanged does not update the last-successful-build tag") {
+        // given: tag created by createAndInitialize, make a change, run buildChanged
         val project = StandardTestProject.createAndInitialize(
             testProjectListener.getTestProjectDir(),
             withRemote = true
@@ -327,10 +327,10 @@ class BuildChangedProjectsFunctionalTest : FunSpec({
         project.commitAll("Change app2")
 
         // when
-        val result = project.runTask("buildChangedProjects")
+        val result = project.runTask("buildChanged")
 
         // then: tag should still point at the original commit
-        result.task(":buildChangedProjects")?.outcome shouldBe TaskOutcome.SUCCESS
+        result.task(":buildChanged")?.outcome shouldBe TaskOutcome.SUCCESS
         val built = result.extractBuiltProjects()
         built shouldContain Projects.APP2
 

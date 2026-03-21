@@ -46,8 +46,8 @@ Functional tests verify end-to-end functionality:
 - Tests real-world scenarios with actual git operations
 
 **Current Functional Tests:**
-- `PrintChangedProjectsFunctionalTest.kt` - Tests the `printChangedProjects` task
-- `BuildChangedProjectsFunctionalTest.kt` - Tests the `buildChangedProjects` task
+- `PrintChangedFunctionalTest.kt` - Tests the `printChanged` task
+- `BuildChangedFunctionalTest.kt` - Tests the `buildChanged` task
 - `MonorepoPluginConfigurationTest.kt` - Configuration and exclude pattern scenarios
 - `MonorepoPluginHierarchyNodeFunctionalTest.kt` - Hierarchy node detection
 - `MonorepoPluginNestedProjectFunctionalTest.kt` - Nested project detection
