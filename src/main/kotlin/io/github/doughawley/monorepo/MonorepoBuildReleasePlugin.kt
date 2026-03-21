@@ -29,8 +29,7 @@ import org.gradle.api.logging.Logger
 class MonorepoBuildReleasePlugin : Plugin<Project> {
 
     private companion object {
-        const val BUILD_TASK_GROUP = "monorepo"
-        const val RELEASE_TASK_GROUP = "monorepo-release"
+        const val TASK_GROUP = "monorepo"
     }
 
     override fun apply(project: Project) {
@@ -101,7 +100,7 @@ class MonorepoBuildReleasePlugin : Plugin<Project> {
                         }
                     }
 
-                    wireDependsOn(project, "buildChangedProjects", rootBuildExtension.allAffectedProjects)
+                    wireDependsOn(project, "buildChanged", rootBuildExtension.allAffectedProjects)
                     rootBuildExtension.metadataComputed = true
                     project.logger.debug("Changed project metadata computed successfully in configuration phase")
                 } catch (e: GradleException) {
@@ -117,14 +116,14 @@ class MonorepoBuildReleasePlugin : Plugin<Project> {
 
         // ── Build tasks ──────────────────────────────────────────────────────────
 
-        project.tasks.register("printChangedProjects", PrintChangedProjectsTask::class.java).configure {
-            group = BUILD_TASK_GROUP
+        project.tasks.register("printChanged", PrintChangedProjectsTask::class.java).configure {
+            group = TASK_GROUP
             description = "Detects which projects have changed based on git history"
             buildExtension = rootBuildExtension
         }
 
-        project.tasks.register("buildChangedProjects").configure {
-            group = BUILD_TASK_GROUP
+        project.tasks.register("buildChanged").configure {
+            group = TASK_GROUP
             description = "Builds only the projects that have been affected by changes"
             val ext = rootBuildExtension
             doLast {
@@ -141,10 +140,10 @@ class MonorepoBuildReleasePlugin : Plugin<Project> {
 
         // ── Aggregate release task ────────────────────────────────────────────
 
-        project.tasks.register("createReleaseBranchesForChangedProjects").configure {
-            group = RELEASE_TASK_GROUP
+        project.tasks.register("createReleaseBranches").configure {
+            group = TASK_GROUP
             description = "Creates release branches for changed projects"
-            dependsOn("buildChangedProjects")
+            dependsOn("buildChanged")
             val buildExt = rootBuildExtension
             val releaseExt = rootReleaseExtension
             val ext = rootExtension
@@ -163,7 +162,7 @@ class MonorepoBuildReleasePlugin : Plugin<Project> {
                 val currentBranch = releaseExecutor.currentBranch()
                 if (currentBranch != ext.primaryBranch) {
                     throw GradleException(
-                        "createReleaseBranchesForChangedProjects must run on '${ext.primaryBranch}', " +
+                        "createReleaseBranches must run on '${ext.primaryBranch}', " +
                         "but the current branch is '$currentBranch'."
                     )
                 }
@@ -223,7 +222,7 @@ class MonorepoBuildReleasePlugin : Plugin<Project> {
      * Resolves the base ref for change detection.
      *
      * The baseline depends on which task the user requested:
-     * - If `createReleaseBranchesForChangedProjects` is requested (CI release build) →
+     * - If `createReleaseBranches` is requested (CI release build) →
      *   fetch the last-successful-build tag from origin (many CI environments
      *   do not fetch tags by default), then use it; if the tag does not exist,
      *   return null so all projects are treated as changed (the first build on
@@ -241,8 +240,8 @@ class MonorepoBuildReleasePlugin : Plugin<Project> {
 
         val requestedTasks = project.gradle.startParameter.taskNames
         val isReleaseRun = requestedTasks.any { taskName ->
-            taskName == "createReleaseBranchesForChangedProjects" ||
-            taskName == ":createReleaseBranchesForChangedProjects"
+            taskName == "createReleaseBranches" ||
+            taskName == ":createReleaseBranches"
         }
 
         if (isReleaseRun) {
@@ -280,9 +279,9 @@ class MonorepoBuildReleasePlugin : Plugin<Project> {
      */
     private fun isChangeDetectionRun(project: Project): Boolean {
         val changeDetectionTasks = setOf(
-            "printChangedProjects", ":printChangedProjects",
-            "buildChangedProjects", ":buildChangedProjects",
-            "createReleaseBranchesForChangedProjects", ":createReleaseBranchesForChangedProjects"
+            "printChanged", ":printChanged",
+            "buildChanged", ":buildChanged",
+            "createReleaseBranches", ":createReleaseBranches"
         )
         return project.gradle.startParameter.taskNames.any { it in changeDetectionTasks }
     }
@@ -403,12 +402,12 @@ class MonorepoBuildReleasePlugin : Plugin<Project> {
         val releaseExecutor = GitReleaseExecutor(sub.rootProject.rootDir, executor, sub.logger)
 
         val postRelease = sub.tasks.register("postRelease") {
-            group = RELEASE_TASK_GROUP
+            group = TASK_GROUP
             description = "Lifecycle hook: wire publish tasks here via finalizedBy"
         }
 
         val releaseTask = sub.tasks.register("release", ReleaseTask::class.java) {
-            group = RELEASE_TASK_GROUP
+            group = TASK_GROUP
             description = "Creates a versioned git tag for this project"
             this.rootExtension = rootExtension
             this.projectConfig = config

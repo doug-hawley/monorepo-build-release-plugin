@@ -21,7 +21,7 @@ A Gradle plugin (Kotlin) that optimizes CI/CD build times in multi-module projec
 To run a single test class, use the `--tests` filter:
 ```bash
 ./gradlew unitTest --tests "io.github.doughawley.monorepo.build.git.GitChangedFilesDetectorTest"
-./gradlew functionalTest --tests "io.github.doughawley.monorepo.build.functional.PrintChangedProjectsFunctionalTest"
+./gradlew functionalTest --tests "io.github.doughawley.monorepo.build.functional.PrintChangedFunctionalTest"
 ```
 
 After running tests, check results in `build/reports/tests/*/index.html` or `build/test-results/*/*.xml` for details.
@@ -73,11 +73,11 @@ The functional tests use a standard 5-module dependency tree (`common-lib` ← `
 
 | File | Task |
 |---|---|
-| `PrintChangedProjectsFunctionalTest.kt` | `printChangedProjects` |
-| `BuildChangedProjectsFunctionalTest.kt` | `buildChangedProjects` |
-| `MonorepoPluginConfigurationTest.kt` | `printChangedProjects` (configuration/exclude scenarios) |
+| `PrintChangedFunctionalTest.kt` | `printChanged` |
+| `BuildChangedFunctionalTest.kt` | `buildChanged` |
+| `MonorepoPluginConfigurationTest.kt` | `printChanged` (configuration/exclude scenarios) |
 | `ReleaseTaskFunctionalTest.kt` | `release` (per-subproject) |
-| `CreateReleaseBranchesForChangedProjectsFunctionalTest.kt` | `createReleaseBranchesForChangedProjects` |
+| `CreateReleaseBranchesFunctionalTest.kt` | `createReleaseBranches` |
 
 ## Code Style
 

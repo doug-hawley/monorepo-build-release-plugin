@@ -22,10 +22,10 @@ class MonorepoPluginHierarchyNodeFunctionalTest : FunSpec({
         // when
         project.appendToFile(Files.APP1_SOURCE, "\n// Modified")
         project.commitAll("Change app1")
-        val result = project.runTask("printChangedProjects")
+        val result = project.runTask("printChanged")
 
         // then
-        result.task(":printChangedProjects")?.outcome shouldBe TaskOutcome.SUCCESS
+        result.task(":printChanged")?.outcome shouldBe TaskOutcome.SUCCESS
         val directlyChanged = result.extractDirectlyChangedProjects()
         directlyChanged shouldContain Projects.APP1
         directlyChanged shouldNotContain ":apps"
@@ -38,10 +38,10 @@ class MonorepoPluginHierarchyNodeFunctionalTest : FunSpec({
         // when
         project.appendToFile(Files.MODULE1_SOURCE, "\n// Modified")
         project.commitAll("Change module1")
-        val result = project.runTask("printChangedProjects")
+        val result = project.runTask("printChanged")
 
         // then
-        result.task(":printChangedProjects")?.outcome shouldBe TaskOutcome.SUCCESS
+        result.task(":printChanged")?.outcome shouldBe TaskOutcome.SUCCESS
         val changed = result.extractChangedProjects()
         changed shouldContain Projects.MODULE1
         changed shouldContain Projects.APP1
@@ -57,10 +57,10 @@ class MonorepoPluginHierarchyNodeFunctionalTest : FunSpec({
         project.appendToFile(Files.APP2_SOURCE, "\n// Modified")
         project.appendToFile(Files.MODULE2_SOURCE, "\n// Modified")
         project.commitAll("Change app2 and module2")
-        val result = project.runTask("printChangedProjects")
+        val result = project.runTask("printChanged")
 
         // then
-        result.task(":printChangedProjects")?.outcome shouldBe TaskOutcome.SUCCESS
+        result.task(":printChanged")?.outcome shouldBe TaskOutcome.SUCCESS
         val directlyChanged = result.extractDirectlyChangedProjects()
         directlyChanged shouldContain Projects.APP2
         directlyChanged shouldContain Projects.MODULE2
@@ -77,10 +77,10 @@ class MonorepoPluginHierarchyNodeFunctionalTest : FunSpec({
             "modules/module2/src/main/kotlin/com/example/NewFeature.kt",
             "package com.example\nclass NewFeature"
         )
-        val result = project.runTask("printChangedProjects")
+        val result = project.runTask("printChanged")
 
         // then
-        result.task(":printChangedProjects")?.outcome shouldBe TaskOutcome.SUCCESS
+        result.task(":printChanged")?.outcome shouldBe TaskOutcome.SUCCESS
         val directlyChanged = result.extractDirectlyChangedProjects()
         directlyChanged shouldContain Projects.MODULE2
         directlyChanged shouldNotContain ":modules"
@@ -105,10 +105,10 @@ class MonorepoPluginHierarchyNodeFunctionalTest : FunSpec({
             "\n// Modified"
         )
         project.commitAll("Change billing impl")
-        val result = project.runTask("printChangedProjects")
+        val result = project.runTask("printChanged")
 
         // then
-        result.task(":printChangedProjects")?.outcome shouldBe TaskOutcome.SUCCESS
+        result.task(":printChanged")?.outcome shouldBe TaskOutcome.SUCCESS
         val directlyChanged = result.extractDirectlyChangedProjects()
         directlyChanged shouldContain ":services:billing:impl"
         directlyChanged shouldNotContain ":services"

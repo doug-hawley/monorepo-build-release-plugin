@@ -197,7 +197,7 @@ monorepo {
 ```
 
 ```bash
-./gradlew printChangedProjects
+./gradlew printChanged
 ```
 
 ### Update Badges (Optional)
