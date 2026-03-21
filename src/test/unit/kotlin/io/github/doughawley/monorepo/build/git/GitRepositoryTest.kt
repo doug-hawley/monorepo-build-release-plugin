@@ -334,6 +334,70 @@ class GitRepositoryTest : FunSpec({
         captureOutput(repoDir, "rev-parse", "movable-tag") shouldBe newCommit
         remoteDir.deleteRecursively()
     }
+    // --- fetchBranch ---
+
+    test("fetchBranch returns true and creates remote-tracking ref when branch exists on remote") {
+        // given: set up a bare remote and push main
+        val remoteDir = Files.createTempDirectory("test-git-remote").toFile()
+        git(remoteDir, "init", "--bare")
+        git(repoDir, "remote", "add", "origin", remoteDir.absolutePath)
+        git(repoDir, "push", "-u", "origin", "main")
+
+        // Delete the remote-tracking ref to simulate a CI checkout
+        git(repoDir, "update-ref", "-d", "refs/remotes/origin/main")
+
+        val repo = GitRepository(repoDir, logger)
+        repo.refExists("origin/main") shouldBe false
+
+        // when
+        val result = repo.fetchBranch("origin", "main")
+
+        // then
+        result shouldBe true
+        repo.refExists("origin/main") shouldBe true
+        remoteDir.deleteRecursively()
+    }
+
+    test("fetchBranch returns false when branch does not exist on remote") {
+        // given
+        val remoteDir = Files.createTempDirectory("test-git-remote").toFile()
+        git(remoteDir, "init", "--bare")
+        git(repoDir, "remote", "add", "origin", remoteDir.absolutePath)
+        git(repoDir, "push", "-u", "origin", "main")
+
+        val repo = GitRepository(repoDir, logger)
+
+        // when
+        val result = repo.fetchBranch("origin", "nonexistent-branch")
+
+        // then
+        result shouldBe false
+        remoteDir.deleteRecursively()
+    }
+
+    test("fetchBranch returns false when not inside a git repository") {
+        // given
+        val nonGitDir = Files.createTempDirectory("test-no-git").toFile()
+
+        // when
+        val result = GitRepository(nonGitDir, logger).fetchBranch("origin", "main")
+
+        // then
+        result shouldBe false
+        nonGitDir.deleteRecursively()
+    }
+
+    test("fetchBranch throws when fetch fails for an unexpected reason") {
+        // given: remote points to a non-existent path
+        git(repoDir, "remote", "add", "origin", "/nonexistent/path/to/repo")
+
+        val repo = GitRepository(repoDir, logger)
+
+        // when / then
+        shouldThrow<RuntimeException> {
+            repo.fetchBranch("origin", "main")
+        }
+    }
 })
 
 private fun git(directory: File, vararg command: String) {

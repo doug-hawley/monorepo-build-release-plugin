@@ -123,6 +123,29 @@ open class GitRepository(
         )
     }
 
+    /**
+     * Fetches a branch from a remote, updating the remote-tracking ref.
+     * Uses `git fetch <remote> <branchName> --quiet` so the local
+     * remote-tracking ref (e.g. origin/main) is created or updated.
+     *
+     * @return true if the fetch succeeded, false if the branch does not exist on the remote
+     * @throws RuntimeException if the fetch fails for an unexpected reason
+     *         (network error, authentication failure, remote misconfigured, etc.)
+     */
+    open fun fetchBranch(remote: String, branchName: String): Boolean {
+        val dir = gitDir ?: return false
+        val result = gitExecutor.executeSilently(dir, "fetch", remote, branchName, "--quiet")
+        if (result.success) {
+            return true
+        }
+        if (result.exitCode == 128 && result.errorOutput.contains(branchName)) {
+            return false
+        }
+        throw RuntimeException(
+            "Failed to fetch branch '$branchName' from '$remote': ${result.errorOutput}"
+        )
+    }
+
     private fun findGitRoot(startDir: File): File? {
         var current: File? = startDir
         while (current != null) {
