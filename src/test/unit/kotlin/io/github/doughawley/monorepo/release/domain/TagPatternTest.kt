@@ -43,7 +43,7 @@ class TagPatternTest : FunSpec({
             ":api" to "api",
             ":services:auth" to "services/auth",
             ":a:b:c" to "a/b/c",
-            ":apps:digital_checkouts-v1" to "apps/digital_checkouts-v1",
+            ":apps:some_domain-v1" to "apps/some_domain-v1",
         ) { (gradlePath, expected) ->
             TagPattern.deriveProjectTagPrefix(gradlePath) shouldBe expected
         }
@@ -73,7 +73,7 @@ class TagPatternTest : FunSpec({
         withData(
             "release/api/v1.2.x" to true,
             "release/services/auth/v0.1.x" to true,
-            "release/apps/digital_checkouts-v1/v0.1.x" to true,
+            "release/apps/some_domain-v1/v0.1.x" to true,
             "main" to false,
             "master" to false,
             "feature/my-feature" to false,
@@ -92,7 +92,7 @@ class TagPatternTest : FunSpec({
         withData(
             Triple("release/api/v0.2.x", 0, 2),
             Triple("release/app/v1.10.x", 1, 10),
-            Triple("release/apps/digital_checkouts-v1/v2.0.x", 2, 0),
+            Triple("release/apps/some_domain-v1/v2.0.x", 2, 0),
         ) { (branch, expectedMajor, expectedMinor) ->
             val (major, minor) = TagPattern.parseVersionLineFromBranch(branch)
             major shouldBe expectedMajor
@@ -118,7 +118,7 @@ class TagPatternTest : FunSpec({
         withData(
             Triple("release/app/v0.1.x", "release", "app"),
             Triple("release/services/auth/v1.2.x", "release", "services/auth"),
-            Triple("release/apps/digital_checkouts-v1/v0.3.x", "release", "apps/digital_checkouts-v1"),
+            Triple("release/apps/some_domain-v1/v0.3.x", "release", "apps/some_domain-v1"),
             Triple("deploy/my-app/v0.3.x", "deploy", "my-app"),
         ) { (branch, globalPrefix, expectedPrefix) ->
             TagPattern.parseProjectPrefixFromBranch(branch, globalPrefix) shouldBe expectedPrefix
