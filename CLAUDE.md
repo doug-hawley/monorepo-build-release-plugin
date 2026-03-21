@@ -77,7 +77,7 @@ The functional tests use a standard 5-module dependency tree (`common-lib` ← `
 | `BuildChangedFunctionalTest.kt` | `buildChanged` |
 | `MonorepoPluginConfigurationTest.kt` | `printChanged` (configuration/exclude scenarios) |
 | `ReleaseTaskFunctionalTest.kt` | `release` (per-subproject) |
-| `CreateReleaseBranchesFunctionalTest.kt` | `createReleaseBranches` |
+| `PrepareReleasesFunctionalTest.kt` | `prepareReleases` |
 
 ## Code Style
 

@@ -43,7 +43,7 @@ monorepo {
 
 The plugin detects changes by comparing HEAD against a baseline ref. The baseline depends on the task:
 
-- **CI release builds** (`createReleaseBranches`): uses the `lastSuccessfulBuildTag`. If the tag doesn't exist (e.g., first run), all projects are treated as changed.
+- **CI release builds** (`prepareReleases`): uses the `lastSuccessfulBuildTag`. If the tag doesn't exist (e.g., first run), all projects are treated as changed.
 - **Dev and PR builds** (all other tasks): uses `origin/{primaryBranch}`. If the remote branch isn't available, all projects are treated as changed.
 
 Individual subprojects can declare their own exclude patterns using the `monorepoProject` extension. Patterns are matched against paths relative to the subproject directory and are applied after global `excludePatterns`.
@@ -78,7 +78,7 @@ Builds all affected projects (including transitive dependents). Useful for PR va
 ./gradlew buildChanged
 ```
 
-> **Note:** `buildChanged` does not update the last-successful-build tag or create release branches. Use `createReleaseBranches` for post-merge CI workflows. `createReleaseBranches` depends on `buildChanged`, so all affected projects are built first automatically.
+> **Note:** `buildChanged` does not update the last-successful-build tag or create release branches. Use `prepareReleases` for post-merge CI workflows. `prepareReleases` depends on `buildChanged`, so all affected projects are built first automatically.
 
 ### Releases
 
@@ -120,12 +120,12 @@ monorepo {
 
 ### Tasks
 
-#### `createReleaseBranches`
+#### `prepareReleases`
 
-The CI post-merge task. Depends on `buildChanged` to build all affected projects first, then creates release branches atomically for opted-in projects and updates the last-successful-build tag. Fails fast if the current branch is not `primaryBranch`.
+The CI post-merge task. Depends on `buildChanged` to build all affected projects first, then creates release branches atomically for changed opted-in projects and updates the last-successful-build tag. Fails fast if the current branch is not `primaryBranch`.
 
 ```bash
-./gradlew createReleaseBranches
+./gradlew prepareReleases
 ```
 
 Release branches are created using a two-phase atomic approach: all branches are created locally first, then pushed together via `git push --atomic`. If any step fails, all local branches are rolled back and the tag is not updated.
@@ -229,7 +229,7 @@ Then build everything affected to verify it compiles before opening the PR:
 The PR is merged into `main` and CI triggers on the merge commit. The plugin compares HEAD against the `monorepo/last-successful-build` tag to find what changed since the last green build:
 
 ```bash
-./gradlew createReleaseBranches
+./gradlew prepareReleases
 ```
 
 `:shared-module` changed, so both apps are included via transitive impact. `:shared-module` itself is skipped because it isn't opted in to releases. The task builds all affected projects, creates release branches atomically, and updates the tag — all in one step.
@@ -277,14 +277,14 @@ The plugin pushes git refs (release branches and the last-successful-build tag) 
 
 #### Pipeline for `main` (post-merge builds)
 
-Configure your main branch pipeline to run `createReleaseBranches` on pushes to `main`:
+Configure your main branch pipeline to run `prepareReleases` on pushes to `main`:
 
 ```yaml
 steps:
   - name: build-and-release
     image: gradle:jdk17
     commands:
-      - ./gradlew createReleaseBranches
+      - ./gradlew prepareReleases
 
 metadata:
   template: false
@@ -294,7 +294,7 @@ ruleset:
   branch: main
 ```
 
-> **Warning:** The `createReleaseBranches` task force-pushes the `monorepo/last-successful-build` tag on every run. If your pipeline triggers on **all** tag events, this will create an infinite loop: task pushes tag → Vela triggers build → task pushes tag → repeat.
+> **Warning:** The `prepareReleases` task force-pushes the `monorepo/last-successful-build` tag on every run. If your pipeline triggers on **all** tag events, this will create an infinite loop: task pushes tag → Vela triggers build → task pushes tag → repeat.
 >
 > Ensure your tag-triggered pipelines filter to version-pattern tags only (e.g., `v*`), not all tags.
 
@@ -317,7 +317,7 @@ ruleset:
   branch: release/*
 ```
 
-> **Warning:** The release branches pushed by `createReleaseBranches` will trigger this pipeline. Make sure the release pipeline does **not** also run `createReleaseBranches`, or you will get recursive triggers.
+> **Warning:** The release branches pushed by `prepareReleases` will trigger this pipeline. Make sure the release pipeline does **not** also run `prepareReleases`, or you will get recursive triggers.
 
 #### Tag-triggered pipelines
 
@@ -349,10 +349,10 @@ jobs:
         with:
           java-version: '17'
           distribution: 'temurin'
-      - run: ./gradlew createReleaseBranches
+      - run: ./gradlew prepareReleases
 ```
 
-> **Warning:** GitHub Actions does **not** trigger workflows from pushes made with the default `GITHUB_TOKEN`. This is a deliberate safeguard against recursive workflows, but it means the release branches created by `createReleaseBranches` will **not** automatically trigger your release workflow.
+> **Warning:** GitHub Actions does **not** trigger workflows from pushes made with the default `GITHUB_TOKEN`. This is a deliberate safeguard against recursive workflows, but it means the release branches created by `prepareReleases` will **not** automatically trigger your release workflow.
 >
 > To trigger release branch workflows, use one of these approaches:
 > 1. **GitHub App token** — use a GitHub App installation token (e.g., via [`actions/create-github-app-token`](https://github.com/actions/create-github-app-token)) instead of `GITHUB_TOKEN` for the checkout step. Pushes made with this token will trigger downstream workflows.
@@ -388,7 +388,7 @@ This workflow will only trigger if pushes to release branches are made with a to
 
 | Property | Type | Default | Description |
 |----------|------|---------|-------------|
-| `primaryBranch` | String | `"main"` | Main integration branch; used as baseline ref (`origin/{primaryBranch}`) for dev and PR builds, and as branch guard for `createReleaseBranches` |
+| `primaryBranch` | String | `"main"` | Main integration branch; used as baseline ref (`origin/{primaryBranch}`) for dev and PR builds, and as branch guard for `prepareReleases` |
 
 ### `monorepo { build { } }`
 
