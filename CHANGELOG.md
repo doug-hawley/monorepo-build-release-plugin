@@ -4,6 +4,39 @@ All notable changes to this project will be documented in this file.
 
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.4.0](https://github.com/doug-hawley/monorepo-build-release-plugin/compare/v0.3.9...v0.4.0) (2026-03-21)
+
+
+### ⚠ BREAKING CHANGES
+
+* Tag and branch prefixes for nested projects now use slashes instead of dashes. Existing tags and branches with the old format will not be found by the plugin.
+* Task names have changed. Update CI scripts and build files that reference the old names.
+
+### Bug Fixes
+
+* log relative path for release-version.txt instead of absolute ([aeb1e85](https://github.com/doug-hawley/monorepo-build-release-plugin/commit/aeb1e8599aeb09f96f2c3ac1ddb43ec4fced8714))
+
+
+### Documentation
+
+* improve README readability and add CI/CD configuration guides ([cfb74fd](https://github.com/doug-hawley/monorepo-build-release-plugin/commit/cfb74fdfc7a5a53ba813de0c7527f00095422da1))
+
+
+### Miscellaneous Chores
+
+* downgrade to Gradle 8.5 for broader consumer compatibility ([84a91e0](https://github.com/doug-hawley/monorepo-build-release-plugin/commit/84a91e0d91ff98d990d368415cceeeee4c082c7e))
+
+
+### Code Refactoring
+
+* shorten task names and unify task group ([920368c](https://github.com/doug-hawley/monorepo-build-release-plugin/commit/920368c6a1830c1d46bcc7531ab44895629c7c97))
+* use hierarchical tag prefix preserving Gradle project path ([a4c0a31](https://github.com/doug-hawley/monorepo-build-release-plugin/commit/a4c0a31e0173819b2d65aea73433353cf4d81805))
+
+
+### Tests
+
+* rename digital_checkouts-v1 to some_domain-v1 in test data ([975cf74](https://github.com/doug-hawley/monorepo-build-release-plugin/commit/975cf74881146b43a90d6e4034a280d341507f98))
+
 ## [0.3.9](https://github.com/doug-hawley/monorepo-build-release-plugin/compare/v0.3.8...v0.3.9) (2026-03-19)
 
 
