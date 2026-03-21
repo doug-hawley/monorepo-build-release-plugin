@@ -74,4 +74,20 @@ class MonorepoPluginConfigurationTest : FunSpec({
         result.output shouldContain "monorepo-build-release-plugin is incompatible with the Gradle configuration cache"
         result.output shouldContain "org.gradle.configuration-cache=false"
     }
+
+    test("plugin fails with helpful error when not inside a git repository") {
+        // given: a project with the plugin applied but no git init
+        val projectDir = testProjectListener.getTestProjectDir()
+        val project = TestProjectBuilder(projectDir)
+            .withSubproject("app")
+            .applyPlugin()
+            .build()
+
+        // when
+        val result = project.runTaskAndFail("printChanged")
+
+        // then
+        result.output shouldContain "not inside a git repository"
+        result.output shouldContain "git init"
+    }
 })
