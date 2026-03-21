@@ -6,7 +6,7 @@ plugins {
 }
 
 group = "io.github.doug-hawley"
-version = "0.4.0" // x-release-please-version
+version = "0.4.1" // x-release-please-version
 
 repositories {
     mavenCentral()

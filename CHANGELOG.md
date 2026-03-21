@@ -4,6 +4,16 @@ All notable changes to this project will be documented in this file.
 
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.4.1](https://github.com/doug-hawley/monorepo-build-release-plugin/compare/v0.4.0...v0.4.1) (2026-03-21)
+
+
+### Bug Fixes
+
+* fetch remote-tracking branch when missing in CI environments ([d33838f](https://github.com/doug-hawley/monorepo-build-release-plugin/commit/d33838f8b6c2e58893b9684d8d12ea4c6d3d02a3))
+* skip release branches that already exist on remote ([ac073d4](https://github.com/doug-hawley/monorepo-build-release-plugin/commit/ac073d4b986e13459610e893b9bde786c4a06d81))
+* use warn log level for skipped release branches ([6143fc8](https://github.com/doug-hawley/monorepo-build-release-plugin/commit/6143fc8e0cb87b9512f2c9e85c564b3b5cacff81))
+* validate git prerequisites before change detection ([0450590](https://github.com/doug-hawley/monorepo-build-release-plugin/commit/0450590043ec87707ab3032f502b387921905c68))
+
 ## [0.4.0](https://github.com/doug-hawley/monorepo-build-release-plugin/compare/v0.3.9...v0.4.0) (2026-03-21)
 
 
