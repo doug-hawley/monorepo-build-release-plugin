@@ -11,7 +11,7 @@ object TagPattern {
     }
 
     fun deriveProjectTagPrefix(gradlePath: String): String {
-        return gradlePath.trimStart(':').replace(':', '-')
+        return gradlePath.trimStart(':').replace(':', '/')
     }
 
     fun parseVersionFromTag(tag: String, globalPrefix: String, projectPrefix: String): SemanticVersion? {
