@@ -38,11 +38,12 @@ class TagPatternTest : FunSpec({
         TagPattern.formatReleaseBranch("deploy", "api", SemanticVersion(1, 0, 0)) shouldBe "deploy/api/v1.0.x"
     }
 
-    context("deriveProjectTagPrefix strips leading colon and replaces inner colons with dashes") {
+    context("deriveProjectTagPrefix strips leading colon and replaces inner colons with slashes") {
         withData(
             ":api" to "api",
-            ":services:auth" to "services-auth",
-            ":a:b:c" to "a-b-c",
+            ":services:auth" to "services/auth",
+            ":a:b:c" to "a/b/c",
+            ":apps:digital_checkouts-v1" to "apps/digital_checkouts-v1",
         ) { (gradlePath, expected) ->
             TagPattern.deriveProjectTagPrefix(gradlePath) shouldBe expected
         }
@@ -71,7 +72,8 @@ class TagPatternTest : FunSpec({
     context("isReleaseBranch with default 'release' prefix") {
         withData(
             "release/api/v1.2.x" to true,
-            "release/services-auth/v0.1.x" to true,
+            "release/services/auth/v0.1.x" to true,
+            "release/apps/digital_checkouts-v1/v0.1.x" to true,
             "main" to false,
             "master" to false,
             "feature/my-feature" to false,
@@ -90,6 +92,7 @@ class TagPatternTest : FunSpec({
         withData(
             Triple("release/api/v0.2.x", 0, 2),
             Triple("release/app/v1.10.x", 1, 10),
+            Triple("release/apps/digital_checkouts-v1/v2.0.x", 2, 0),
         ) { (branch, expectedMajor, expectedMinor) ->
             val (major, minor) = TagPattern.parseVersionLineFromBranch(branch)
             major shouldBe expectedMajor
@@ -114,7 +117,8 @@ class TagPatternTest : FunSpec({
     context("parseProjectPrefixFromBranch extracts the project prefix") {
         withData(
             Triple("release/app/v0.1.x", "release", "app"),
-            Triple("release/services-auth/v1.2.x", "release", "services-auth"),
+            Triple("release/services/auth/v1.2.x", "release", "services/auth"),
+            Triple("release/apps/digital_checkouts-v1/v0.3.x", "release", "apps/digital_checkouts-v1"),
             Triple("deploy/my-app/v0.3.x", "deploy", "my-app"),
         ) { (branch, globalPrefix, expectedPrefix) ->
             TagPattern.parseProjectPrefixFromBranch(branch, globalPrefix) shouldBe expectedPrefix
@@ -122,7 +126,7 @@ class TagPatternTest : FunSpec({
     }
 
     test("branch-to-project matching works for nested project paths") {
-        // given — a nested project like :services:auth-v2 derives to "services-auth-v2"
+        // given — a nested project like :services:auth-v2 derives to "services/auth-v2"
         val gradlePath = ":services:auth-v2"
         val projectPrefix = TagPattern.deriveProjectTagPrefix(gradlePath)
 
@@ -132,6 +136,6 @@ class TagPatternTest : FunSpec({
 
         // then — round-trip: derived prefix matches parsed prefix
         parsedPrefix shouldBe projectPrefix
-        parsedPrefix shouldBe "services-auth-v2"
+        parsedPrefix shouldBe "services/auth-v2"
     }
 })

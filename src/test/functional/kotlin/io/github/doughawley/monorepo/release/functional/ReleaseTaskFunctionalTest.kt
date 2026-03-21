@@ -200,8 +200,8 @@ class ReleaseTaskFunctionalTest : FunSpec({
         project.remoteTags() shouldContain "release/my-custom-app/v0.1.0"
     }
 
-    test("nested subproject path produces hyphenated tag prefix") {
-        // given: :services:auth → deriveProjectTagPrefix → "services-auth"
+    test("nested subproject path produces hierarchical tag prefix") {
+        // given: :services:auth → deriveProjectTagPrefix → "services/auth"
         val projectDir = testListener.getTestProjectDir()
         val remoteDir = File(projectDir.parentFile, "${projectDir.name}-remote.git")
 
@@ -245,8 +245,8 @@ class ReleaseTaskFunctionalTest : FunSpec({
         project.initGit()
         project.commitAll("Initial commit")
         project.pushToRemote()
-        project.createBranch("release/services-auth/v0.1.x")
-        project.executeGitPush("release/services-auth/v0.1.x")
+        project.createBranch("release/services/auth/v0.1.x")
+        project.executeGitPush("release/services/auth/v0.1.x")
         File(projectDir, "services/auth/build/libs").mkdirs()
         File(projectDir, "services/auth/build/libs/auth.jar").writeText("fake jar content")
 
@@ -255,7 +255,7 @@ class ReleaseTaskFunctionalTest : FunSpec({
 
         // then
         result.task(":services:auth:release")?.outcome shouldBe TaskOutcome.SUCCESS
-        project.remoteTags() shouldContain "release/services-auth/v0.1.0"
+        project.remoteTags() shouldContain "release/services/auth/v0.1.0"
     }
 
     // ─────────────────────────────────────────────────────────────
