@@ -20,17 +20,13 @@ import io.github.doughawley.monorepo.release.git.GitTagScanner
 import org.gradle.api.GradleException
 import org.gradle.api.Plugin
 import org.gradle.api.Project
-import org.gradle.api.configuration.BuildFeatures
 import org.gradle.api.logging.Logger
-import javax.inject.Inject
 
 /**
  * Gradle plugin that combines change detection and per-project versioned tagging
  * for Gradle monorepos.
  */
-class MonorepoBuildReleasePlugin @Inject constructor(
-    private val buildFeatures: BuildFeatures
-) : Plugin<Project> {
+class MonorepoBuildReleasePlugin : Plugin<Project> {
 
     private companion object {
         const val BUILD_TASK_GROUP = "monorepo"
@@ -38,7 +34,7 @@ class MonorepoBuildReleasePlugin @Inject constructor(
     }
 
     override fun apply(project: Project) {
-        if (buildFeatures.configurationCache.requested.getOrElse(false)) {
+        if (project.gradle.startParameter.isConfigurationCacheRequested) {
             throw GradleException(
                 "monorepo-build-release-plugin is incompatible with the Gradle configuration cache " +
                 "because it executes git commands during the configuration phase. " +

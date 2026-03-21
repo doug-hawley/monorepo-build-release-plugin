@@ -2,7 +2,7 @@ package io.github.doughawley.monorepo.build.functional
 
 import io.kotest.core.listeners.TestListener
 import io.kotest.core.test.TestCase
-import io.kotest.engine.test.TestResult
+import io.kotest.core.test.TestResult
 import java.io.File
 
 /**
@@ -59,7 +59,7 @@ class TestProjectListener : TestListener {
 
     override suspend fun beforeEach(testCase: TestCase) {
         // Sanitize test name for use in file paths (Windows doesn't allow : < > " | ? *)
-        val sanitizedTestName = testCase.name.name.replace(Regex("[:<>\"|?*/]"), "-")
+        val sanitizedTestName = testCase.name.testName.replace(Regex("[:<>\"|?*/]"), "-")
         val tempDir = kotlin.io.path.createTempDirectory("monorepo-test-$sanitizedTestName").toFile()
         currentTestDir = tempDir
     }

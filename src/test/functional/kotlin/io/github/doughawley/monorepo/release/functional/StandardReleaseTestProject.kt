@@ -2,7 +2,7 @@ package io.github.doughawley.monorepo.release.functional
 
 import io.kotest.core.listeners.TestListener
 import io.kotest.core.test.TestCase
-import io.kotest.engine.test.TestResult
+import io.kotest.core.test.TestResult
 import org.gradle.testkit.runner.BuildResult
 import org.gradle.testkit.runner.GradleRunner
 import java.io.File
@@ -429,7 +429,7 @@ class ReleaseTestProjectListener : TestListener {
     }
 
     override suspend fun beforeEach(testCase: TestCase) {
-        val sanitizedTestName = testCase.name.name.replace(Regex("[:<>\"|?*/]"), "-")
+        val sanitizedTestName = testCase.name.testName.replace(Regex("[:<>\"|?*/]"), "-")
         val tempDir = kotlin.io.path.createTempDirectory("release-test-$sanitizedTestName").toFile()
         currentTestDir = tempDir
     }

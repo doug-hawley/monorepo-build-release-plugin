@@ -2,7 +2,7 @@ package io.github.doughawley.monorepo.release.git
 
 import io.kotest.core.listeners.TestListener
 import io.kotest.core.test.TestCase
-import io.kotest.engine.test.TestResult
+import io.kotest.core.test.TestResult
 import java.io.File
 import java.nio.file.Files
 
