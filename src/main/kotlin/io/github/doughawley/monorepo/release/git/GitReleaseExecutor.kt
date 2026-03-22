@@ -89,6 +89,16 @@ class GitReleaseExecutor(
         logger.lifecycle("Pushed ${branches.size} branch(es) atomically to remote")
     }
 
+    fun pushRefsAtomically(refs: List<String>) {
+        val args = mutableListOf("push", "--atomic", "origin")
+        args.addAll(refs)
+        val result = executor.execute(rootDir, *args.toTypedArray())
+        if (!result.success) {
+            throw GradleException("Atomic push of ${refs.size} ref(s) failed: ${result.errorOutput}")
+        }
+        logger.lifecycle("Pushed ${refs.size} ref(s) atomically to remote")
+    }
+
     fun branchExistsLocally(branch: String): Boolean {
         val result = executor.execute(rootDir, "branch", "--list", branch)
         return result.success && result.output.isNotEmpty()

@@ -5,6 +5,54 @@ import io.kotest.matchers.shouldBe
 
 class NextVersionResolverTest : FunSpec({
 
+    // ── forMainBranch ────────────────────────────────────────────
+
+    test("forMainBranch with no prior tags returns 0.1.0") {
+        // given
+        val latestVersion: SemanticVersion? = null
+
+        // when
+        val result = NextVersionResolver.forMainBranch(latestVersion, Scope.MINOR)
+
+        // then
+        result shouldBe SemanticVersion(0, 1, 0)
+    }
+
+    test("forMainBranch with no prior tags and major scope returns 0.1.0") {
+        // given
+        val latestVersion: SemanticVersion? = null
+
+        // when
+        val result = NextVersionResolver.forMainBranch(latestVersion, Scope.MAJOR)
+
+        // then
+        result shouldBe SemanticVersion(0, 1, 0)
+    }
+
+    test("forMainBranch with existing tag bumps minor") {
+        // given
+        val latestVersion = SemanticVersion(0, 1, 0)
+
+        // when
+        val result = NextVersionResolver.forMainBranch(latestVersion, Scope.MINOR)
+
+        // then
+        result shouldBe SemanticVersion(0, 2, 0)
+    }
+
+    test("forMainBranch with existing tag bumps major") {
+        // given
+        val latestVersion = SemanticVersion(0, 2, 0)
+
+        // when
+        val result = NextVersionResolver.forMainBranch(latestVersion, Scope.MAJOR)
+
+        // then
+        result shouldBe SemanticVersion(1, 0, 0)
+    }
+
+    // ── forReleaseBranch ─────────────────────────────────────────
+
     test("forReleaseBranch with no prior tags in version line returns major.minor.0") {
         // given — on release branch v0.2.x with no v0.2.* tags
         val latestInLine: SemanticVersion? = null

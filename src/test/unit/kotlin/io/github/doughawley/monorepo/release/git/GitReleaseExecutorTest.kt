@@ -216,6 +216,32 @@ class GitReleaseExecutorTest : FunSpec({
         verify { logger.warn(any()) }
     }
 
+    // pushRefsAtomically
+
+    test("pushRefsAtomically pushes tags and branches in a single atomic call") {
+        // given
+        val refs = listOf("release/app/v0.1.0", "release/app/v0.1.x")
+        every { executor.execute(rootDir, "push", "--atomic", "origin", "release/app/v0.1.0", "release/app/v0.1.x") } returns
+            CommandResult(success = true, output = emptyList(), exitCode = 0)
+
+        // when
+        releaseExecutor.pushRefsAtomically(refs)
+
+        // then
+        verify { executor.execute(rootDir, "push", "--atomic", "origin", "release/app/v0.1.0", "release/app/v0.1.x") }
+    }
+
+    test("pushRefsAtomically throws GradleException when push fails") {
+        // given
+        val refs = listOf("release/app/v0.1.0", "release/app/v0.1.x")
+        every { executor.execute(rootDir, "push", "--atomic", "origin", "release/app/v0.1.0", "release/app/v0.1.x") } returns
+            CommandResult(success = false, output = emptyList(), exitCode = 1, errorOutput = "atomic push rejected")
+
+        // when / then
+        val ex = shouldThrow<GradleException> { releaseExecutor.pushRefsAtomically(refs) }
+        ex.message shouldContain "Atomic push of 2 ref(s) failed"
+    }
+
     // branchExistsOnRemote
 
     test("branchExistsOnRemote returns true when ls-remote returns output") {
