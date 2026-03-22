@@ -14,6 +14,20 @@ object NextVersionResolver {
      * @param minor the minor version from the release branch name
      * @param scope the bump scope (always PATCH on release branches)
      */
+    /**
+     * Resolves the next version for a release from the primary branch.
+     *
+     * @param latestVersion the highest existing version across all version lines, or null if no tags exist
+     * @param scope the bump scope (major or minor)
+     */
+    fun forMainBranch(latestVersion: SemanticVersion?, scope: Scope): SemanticVersion {
+        return if (latestVersion == null) {
+            SemanticVersion(0, 1, 0)
+        } else {
+            latestVersion.bump(scope)
+        }
+    }
+
     fun forReleaseBranch(latestInLine: SemanticVersion?, major: Int, minor: Int, scope: Scope): SemanticVersion {
         return if (latestInLine == null) {
             SemanticVersion(major, minor, 0)

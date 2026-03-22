@@ -43,7 +43,7 @@ monorepo {
 
 The plugin detects changes by comparing HEAD against a baseline ref. The baseline depends on the task:
 
-- **CI release builds** (`prepareReleasesForChanged`): uses the `lastSuccessfulBuildTag`. If the tag doesn't exist (e.g., first run), all projects are treated as changed.
+- **CI release builds** (`releaseChanged`): uses the `lastSuccessfulBuildTag`. If the tag doesn't exist (e.g., first run), all projects are treated as changed.
 - **Dev and PR builds** (all other tasks): uses `origin/{primaryBranch}`. If the remote branch isn't available, all projects are treated as changed.
 
 Individual subprojects can declare their own exclude patterns using the `monorepoProject` extension. Patterns are matched against paths relative to the subproject directory and are applied after global `excludePatterns`.
@@ -78,7 +78,7 @@ Builds all affected projects (including transitive dependents). Useful for PR va
 ./gradlew buildChanged
 ```
 
-> **Note:** `buildChanged` does not update the last-successful-build tag or create release branches. Use `prepareReleasesForChanged` for post-merge CI workflows. `prepareReleasesForChanged` depends on `buildChanged`, so all affected projects are built first automatically.
+> **Note:** `buildChanged` does not update the last-successful-build tag or create releases. Use `releaseChanged` for post-merge CI workflows. `releaseChanged` depends on `buildChanged`, so all affected projects are built first automatically.
 
 ### Releases
 
@@ -120,19 +120,19 @@ monorepo {
 
 ### Tasks
 
-#### `prepareReleasesForChanged`
+#### `releaseChanged`
 
-The CI post-merge task. Depends on `buildChanged` to build all affected projects first, then creates release branches atomically for changed opted-in projects and updates the last-successful-build tag. Fails fast if the current branch is not `primaryBranch`.
+The CI post-merge task. Depends on `buildChanged` to build all affected projects first, then creates version tags and release branches atomically for changed opted-in projects, writes `release-version.txt` per subproject, and updates the last-successful-build tag. Fails fast if the current branch is not `primaryBranch`.
 
 ```bash
-./gradlew prepareReleasesForChanged
+./gradlew releaseChanged
 ```
 
-Release branches are created using a two-phase atomic approach: all branches are created locally first, then pushed together via `git push --atomic`. If any step fails, all local branches are rolled back and the tag is not updated.
+Tags and release branches are created using a two-phase atomic approach: all refs are created locally first, then pushed together via `git push --atomic`. If any step fails, all local refs are rolled back and the tag is not updated. Release branches are created alongside tags for future patch releases.
 
 #### `:subproject:release`
 
-Releases a single subproject from its release branch. Must be run from a matching release branch (e.g., `:app1:release` must be run from `release/app1/v0.1.x`):
+Releases a single subproject from its release branch for patch releases. Must be run from a matching release branch (e.g., `:app1:release` must be run from `release/app1/v0.1.x`):
 
 ```bash
 ./gradlew :api:release
@@ -229,28 +229,17 @@ Then build everything affected to verify it compiles before opening the PR:
 The PR is merged into `main` and CI triggers on the merge commit. The plugin compares HEAD against the `monorepo/last-successful-build` tag to find what changed since the last green build:
 
 ```bash
-./gradlew prepareReleasesForChanged
+./gradlew releaseChanged
 ```
 
-`:shared-module` changed, so both apps are included via transitive impact. `:shared-module` itself is skipped because it isn't opted in to releases. The task builds all affected projects, creates release branches atomically, and updates the tag — all in one step.
+`:shared-module` changed, so both apps are included via transitive impact. `:shared-module` itself is skipped because it isn't opted in to releases. The task builds all affected projects, creates version tags and release branches atomically, writes `release-version.txt`, and updates the last-successful-build tag — all in one step.
 
-```
-Created release branches for: :app1, :app2
-```
+| Project | Tag created | Release branch created |
+|---------|-------------|------------------------|
+| `:app1` | `release/app1/v0.1.0` | `release/app1/v0.1.x`  |
+| `:app2` | `release/app2/v0.1.0` | `release/app2/v0.1.x`  |
 
-| Project | Release branch created |
-|---------|------------------------|
-| `:app1` | `release/app1/v0.1.x`  |
-| `:app2` | `release/app2/v0.1.x`  |
-
-A separate CI/CD pipeline configured to trigger on pushes to `release/**` branches then runs `:subproject:release` for each project. That pipeline is responsible for creating the version tag and publishing the artifact:
-
-```bash
-./gradlew :app1:release   # creates tag release/app1/v0.1.0, writes release-version.txt
-./gradlew :app2:release   # creates tag release/app2/v0.1.0, writes release-version.txt
-```
-
-Wire your publish step to the `postRelease` lifecycle hook so it runs automatically after tagging. Alternatively, the `release` task writes the released version to `build/release-version.txt`, which your CI/CD pipeline can read to determine the version for publishing:
+The `releaseChanged` task writes the released version to `build/release-version.txt` per subproject, which your CI/CD pipeline can read for publishing:
 
 ```bash
 VERSION=$(cat app1/build/release-version.txt)
@@ -271,20 +260,20 @@ The plugin detects it is on a release branch and applies a patch bump. Tag `rele
 
 ## CI/CD Configuration
 
-The plugin pushes git refs (release branches and the last-successful-build tag) during task execution. These pushes can interact with your CI/CD platform's trigger rules in unexpected ways. The sections below cover platform-specific configuration to avoid recursive triggers and ensure release workflows run correctly.
+The plugin pushes git refs (version tags, release branches, and the last-successful-build tag) during task execution. These pushes can interact with your CI/CD platform's trigger rules in unexpected ways. The sections below cover platform-specific configuration to avoid recursive triggers and ensure release workflows run correctly.
 
 ### Vela
 
 #### Pipeline for `main` (post-merge builds)
 
-Configure your main branch pipeline to run `prepareReleasesForChanged` on pushes to `main`:
+Configure your main branch pipeline to run `releaseChanged` on pushes to `main`:
 
 ```yaml
 steps:
   - name: build-and-release
     image: gradle:jdk17
     commands:
-      - ./gradlew prepareReleasesForChanged
+      - ./gradlew releaseChanged
 
 metadata:
   template: false
@@ -294,30 +283,9 @@ ruleset:
   branch: main
 ```
 
-> **Warning:** The `prepareReleasesForChanged` task force-pushes the `monorepo/last-successful-build` tag on every run. If your pipeline triggers on **all** tag events, this will create an infinite loop: task pushes tag → Vela triggers build → task pushes tag → repeat.
+> **Warning:** The `releaseChanged` task force-pushes the `monorepo/last-successful-build` tag on every run. If your pipeline triggers on **all** tag events, this will create an infinite loop: task pushes tag → Vela triggers build → task pushes tag → repeat.
 >
-> Ensure your tag-triggered pipelines filter to version-pattern tags only (e.g., `v*`), not all tags.
-
-#### Pipeline for release branches
-
-Configure a separate pipeline to run the per-project release task when a release branch is pushed:
-
-```yaml
-steps:
-  - name: release
-    image: gradle:jdk17
-    commands:
-      - ./gradlew :${VELA_REPO_BRANCH_PROJECT}:release
-
-metadata:
-  template: false
-
-ruleset:
-  event: push
-  branch: release/*
-```
-
-> **Warning:** The release branches pushed by `prepareReleasesForChanged` will trigger this pipeline. Make sure the release pipeline does **not** also run `prepareReleasesForChanged`, or you will get recursive triggers.
+> Ensure your tag-triggered pipelines filter to version-pattern tags only (e.g., `release/*/v*`), not all tags.
 
 #### Tag-triggered pipelines
 
@@ -327,6 +295,17 @@ If you have pipelines that trigger on tag events (e.g., for publishing artifacts
 ruleset:
   event: tag
   tag: "release/*/v*"    # only version tags, not monorepo/last-successful-build
+```
+
+Since `releaseChanged` writes `release-version.txt` per subproject, your publish step can read the version directly:
+
+```yaml
+steps:
+  - name: publish
+    image: gradle:jdk17
+    commands:
+      - VERSION=$(cat app1/build/release-version.txt)
+      - ./publish.sh --version "$VERSION"
 ```
 
 ### GitHub Actions
@@ -349,17 +328,12 @@ jobs:
         with:
           java-version: '17'
           distribution: 'temurin'
-      - run: ./gradlew prepareReleasesForChanged
+      - run: ./gradlew releaseChanged
 ```
 
-> **Warning:** GitHub Actions does **not** trigger workflows from pushes made with the default `GITHUB_TOKEN`. This is a deliberate safeguard against recursive workflows, but it means the release branches created by `prepareReleasesForChanged` will **not** automatically trigger your release workflow.
->
-> To trigger release branch workflows, use one of these approaches:
-> 1. **GitHub App token** — use a GitHub App installation token (e.g., via [`actions/create-github-app-token`](https://github.com/actions/create-github-app-token)) instead of `GITHUB_TOKEN` for the checkout step. Pushes made with this token will trigger downstream workflows.
-> 2. **`workflow_dispatch`** — add a `workflow_dispatch` trigger to your release workflow and dispatch it from the main workflow after branch creation.
-> 3. **Personal Access Token** — use a PAT with repo scope (less recommended for shared repositories).
+> **Note:** `releaseChanged` creates version tags, release branches, and writes `release-version.txt` — all in one step. No separate release branch pipeline is needed for the initial release. Release branches exist for future patch releases only.
 
-#### Workflow for release branches
+#### Workflow for patch releases from release branches
 
 ```yaml
 on:
@@ -380,7 +354,11 @@ jobs:
       - run: ./gradlew $(echo "${GITHUB_REF_NAME}" | sed 's|release/|:|;s|/v.*||'):release
 ```
 
-This workflow will only trigger if pushes to release branches are made with a token that allows workflow triggering (see warning above).
+> **Warning:** GitHub Actions does **not** trigger workflows from pushes made with the default `GITHUB_TOKEN`. This is a deliberate safeguard against recursive workflows, but it means the release branches created by `releaseChanged` will **not** automatically trigger patch release workflows.
+>
+> For patch releases, developers push commits directly to release branches. To ensure the workflow triggers, use one of these approaches:
+> 1. **GitHub App token** — use a GitHub App installation token (e.g., via [`actions/create-github-app-token`](https://github.com/actions/create-github-app-token)) instead of `GITHUB_TOKEN` for the checkout step.
+> 2. **Personal Access Token** — use a PAT with repo scope (less recommended for shared repositories).
 
 ## Configuration Reference
 
@@ -388,7 +366,7 @@ This workflow will only trigger if pushes to release branches are made with a to
 
 | Property | Type | Default | Description |
 |----------|------|---------|-------------|
-| `primaryBranch` | String | `"main"` | Main integration branch; used as baseline ref (`origin/{primaryBranch}`) for dev and PR builds, and as branch guard for `prepareReleasesForChanged` |
+| `primaryBranch` | String | `"main"` | Main integration branch; used as baseline ref (`origin/{primaryBranch}`) for dev and PR builds, and as branch guard for `releaseChanged` |
 
 ### `monorepo { build { } }`
 

@@ -12,7 +12,7 @@ import io.github.doughawley.monorepo.release.MonorepoReleaseConfigExtension
 import io.github.doughawley.monorepo.release.MonorepoReleaseExtension
 import io.github.doughawley.monorepo.release.domain.Scope
 import io.github.doughawley.monorepo.release.domain.TagPattern
-import io.github.doughawley.monorepo.release.git.AtomicReleaseBranchCreator
+import io.github.doughawley.monorepo.release.git.AtomicReleaseCreator
 import io.github.doughawley.monorepo.release.task.ReleaseTask
 import io.github.doughawley.monorepo.git.GitCommandExecutor
 import io.github.doughawley.monorepo.release.git.GitReleaseExecutor
@@ -59,7 +59,7 @@ class MonorepoBuildReleasePlugin : Plugin<Project> {
         }
 
         // Register per-subproject release tasks eagerly so that build scripts can configure
-        // tasks like postRelease during their own configuration phase.
+        // them during their own configuration phase.
         project.subprojects.forEach { sub ->
             val projectExtension = sub.extensions.findByType(MonorepoProjectExtension::class.java)
                 ?: sub.extensions.create("monorepoProject", MonorepoProjectExtension::class.java)
@@ -141,9 +141,9 @@ class MonorepoBuildReleasePlugin : Plugin<Project> {
 
         // ── Aggregate release task ────────────────────────────────────────────
 
-        project.tasks.register("prepareReleasesForChanged").configure {
+        project.tasks.register("releaseChanged").configure {
             group = TASK_GROUP
-            description = "Prepares releases by creating release branches for changed projects"
+            description = "Builds, tags, and creates release branches for changed projects"
             dependsOn("buildChanged")
             val buildExt = rootBuildExtension
             val releaseExt = rootReleaseExtension
@@ -163,7 +163,7 @@ class MonorepoBuildReleasePlugin : Plugin<Project> {
                 val currentBranch = releaseExecutor.currentBranch()
                 if (currentBranch != ext.primaryBranch) {
                     throw GradleException(
-                        "prepareReleasesForChanged must run on '${ext.primaryBranch}', " +
+                        "releaseChanged must run on '${ext.primaryBranch}', " +
                         "but the current branch is '$currentBranch'."
                     )
                 }
@@ -189,7 +189,7 @@ class MonorepoBuildReleasePlugin : Plugin<Project> {
                 }
 
                 if (optedInProjects.isEmpty()) {
-                    logger.lifecycle("No opted-in changed projects — no release branches to create")
+                    logger.lifecycle("No opted-in changed projects — nothing to release")
                     tagUpdater.updateTag(buildExt.lastSuccessfulBuildTag)
                     return@doLast
                 }
@@ -206,10 +206,21 @@ class MonorepoBuildReleasePlugin : Plugin<Project> {
                     )
                 }
 
-                // Atomic branch creation
+                // Atomic tag + branch creation
                 val tagScanner = GitTagScanner(rootDir, executor)
-                val branchCreator = AtomicReleaseBranchCreator(releaseExecutor, tagScanner, logger)
-                branchCreator.createReleaseBranches(optedInProjects, releaseExt.globalTagPrefix, scope)
+                val releaseCreator = AtomicReleaseCreator(releaseExecutor, tagScanner, logger)
+                val result = releaseCreator.releaseProjects(optedInProjects, releaseExt.globalTagPrefix, scope)
+
+                // Write release-version.txt per subproject
+                result.projectToVersion.forEach { (projectPath, version) ->
+                    val targetProject = rootProject.findProject(projectPath) ?: return@forEach
+                    val versionFile = targetProject.layout.buildDirectory
+                        .file("release-version.txt").get().asFile
+                    versionFile.parentFile.mkdirs()
+                    versionFile.writeText(version.toString())
+                    val relativePath = rootProject.rootDir.toPath().relativize(versionFile.toPath())
+                    logger.lifecycle("Wrote release version to: $relativePath")
+                }
 
                 // Update last-successful-build tag
                 tagUpdater.updateTag(buildExt.lastSuccessfulBuildTag)
@@ -223,7 +234,7 @@ class MonorepoBuildReleasePlugin : Plugin<Project> {
      * Resolves the base ref for change detection.
      *
      * The baseline depends on which task the user requested:
-     * - If `prepareReleasesForChanged` is requested (CI release build) →
+     * - If `releaseChanged` is requested (CI release build) →
      *   fetch the last-successful-build tag from origin (many CI environments
      *   do not fetch tags by default), then use it; if the tag does not exist,
      *   return null so all projects are treated as changed (the first build on
@@ -241,8 +252,8 @@ class MonorepoBuildReleasePlugin : Plugin<Project> {
 
         val requestedTasks = project.gradle.startParameter.taskNames
         val isReleaseRun = requestedTasks.any { taskName ->
-            taskName == "prepareReleasesForChanged" ||
-            taskName == ":prepareReleasesForChanged"
+            taskName == "releaseChanged" ||
+            taskName == ":releaseChanged"
         }
 
         if (isReleaseRun) {
@@ -291,7 +302,7 @@ class MonorepoBuildReleasePlugin : Plugin<Project> {
         val changeDetectionTasks = setOf(
             "printChanged", ":printChanged",
             "buildChanged", ":buildChanged",
-            "prepareReleasesForChanged", ":prepareReleasesForChanged"
+            "releaseChanged", ":releaseChanged"
         )
         return project.gradle.startParameter.taskNames.any { it in changeDetectionTasks }
     }
@@ -411,12 +422,7 @@ class MonorepoBuildReleasePlugin : Plugin<Project> {
         val scanner = GitTagScanner(sub.rootProject.rootDir, executor)
         val releaseExecutor = GitReleaseExecutor(sub.rootProject.rootDir, executor, sub.logger)
 
-        val postRelease = sub.tasks.register("postRelease") {
-            group = TASK_GROUP
-            description = "Lifecycle hook: wire publish tasks here via finalizedBy"
-        }
-
-        val releaseTask = sub.tasks.register("release", ReleaseTask::class.java) {
+        sub.tasks.register("release", ReleaseTask::class.java) {
             group = TASK_GROUP
             description = "Creates a versioned git tag for this project"
             this.rootExtension = rootExtension
@@ -427,15 +433,6 @@ class MonorepoBuildReleasePlugin : Plugin<Project> {
             this.buildDir.set(sub.layout.buildDirectory)
             this.releaseScopeProperty = sub.findProperty("release.scope") as? String
             dependsOn("build")
-            finalizedBy(postRelease)
-        }
-
-        postRelease.configure {
-            onlyIf {
-                val state = releaseTask.get().state
-                val failure: Throwable? = state.failure
-                state.executed && failure == null
-            }
         }
     }
 

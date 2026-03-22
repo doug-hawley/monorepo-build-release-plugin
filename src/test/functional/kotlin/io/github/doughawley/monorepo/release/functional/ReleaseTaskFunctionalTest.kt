@@ -5,7 +5,6 @@ import io.kotest.matchers.collections.shouldContain
 import io.kotest.matchers.collections.shouldNotContain
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
-import io.kotest.matchers.string.shouldNotContain
 import org.gradle.testkit.runner.TaskOutcome
 import java.io.File
 
@@ -613,131 +612,6 @@ class ReleaseTaskFunctionalTest : FunSpec({
 
         // then
         project.releaseVersionFile() shouldBe "0.1.0"
-    }
-
-    // ─────────────────────────────────────────────────────────────
-    // postRelease hook
-    // ─────────────────────────────────────────────────────────────
-
-    test("postRelease task runs after successful release") {
-        // given
-        val projectDir = testListener.getTestProjectDir()
-        val remoteDir = File(projectDir.parentFile, "${projectDir.name}-remote.git")
-
-        File(projectDir, "build.gradle.kts").writeText(
-            """
-            plugins {
-                id("io.github.doug-hawley.monorepo-build-release-plugin")
-            }
-
-            allprojects {
-                repositories {
-                    mavenCentral()
-                }
-            }
-            """.trimIndent()
-        )
-        File(projectDir, "settings.gradle.kts").writeText(
-            """
-            rootProject.name = "test-project"
-            include(":app")
-            """.trimIndent()
-        )
-        File(projectDir, ".gitignore").writeText(".gradle/\n.kotlin/\nbuild/")
-        val appDir = File(projectDir, "app")
-        appDir.mkdirs()
-        File(appDir, "build.gradle.kts").writeText(
-            """
-            plugins {
-                kotlin("jvm") version "2.0.21"
-            }
-            monorepoProject {
-                release {
-                    enabled = true
-                }
-            }
-            tasks.named("postRelease") {
-                doLast {
-                    println("POST_RELEASE_RAN")
-                }
-            }
-            """.trimIndent()
-        )
-
-        val project = ReleaseTestProject(projectDir, remoteDir)
-        project.initGit()
-        project.commitAll("Initial commit")
-        project.pushToRemote()
-        project.createBranch("release/app/v0.1.x")
-        project.executeGitPush("release/app/v0.1.x")
-        project.createFakeBuiltArtifact()
-
-        // when
-        val result = project.runTask(":app:release")
-
-        // then
-        result.task(":app:postRelease")?.outcome shouldBe TaskOutcome.SUCCESS
-        result.output shouldContain "POST_RELEASE_RAN"
-    }
-
-    test("postRelease hook does not run if release task fails") {
-        // given: release will fail because of uncommitted changes
-        val projectDir = testListener.getTestProjectDir()
-        val remoteDir = File(projectDir.parentFile, "${projectDir.name}-remote.git")
-
-        File(projectDir, "build.gradle.kts").writeText(
-            """
-            plugins {
-                id("io.github.doug-hawley.monorepo-build-release-plugin")
-            }
-
-            allprojects {
-                repositories {
-                    mavenCentral()
-                }
-            }
-            """.trimIndent()
-        )
-        File(projectDir, "settings.gradle.kts").writeText(
-            """
-            rootProject.name = "test-project"
-            include(":app")
-            """.trimIndent()
-        )
-        File(projectDir, ".gitignore").writeText(".gradle/\n.kotlin/\nbuild/")
-        val appDir = File(projectDir, "app")
-        appDir.mkdirs()
-        File(appDir, "build.gradle.kts").writeText(
-            """
-            plugins {
-                kotlin("jvm") version "2.0.21"
-            }
-            monorepoProject {
-                release {
-                    enabled = true
-                }
-            }
-            tasks.named("postRelease") {
-                doLast {
-                    println("POST_RELEASE_RAN")
-                }
-            }
-            """.trimIndent()
-        )
-
-        val project = ReleaseTestProject(projectDir, remoteDir)
-        project.initGit()
-        project.commitAll("Initial commit")
-        project.pushToRemote()
-        project.createBranch("release/app/v0.1.x")
-        project.executeGitPush("release/app/v0.1.x")
-        project.modifyFile("app/dirty.txt", "uncommitted change")
-
-        // when
-        val result = project.runTaskAndFail(":app:release")
-
-        // then
-        result.output shouldNotContain "POST_RELEASE_RAN"
     }
 
     // ─────────────────────────────────────────────────────────────
