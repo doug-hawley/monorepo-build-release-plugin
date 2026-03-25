@@ -75,10 +75,10 @@ class ReleaseChangedFunctionalTest : FunSpec({
     }
 
     // ─────────────────────────────────────────────────────────────
-    // Single project changed — creates tag + branch
+    // Single project changed — creates branch (no tag)
     // ─────────────────────────────────────────────────────────────
 
-    test("creates tag and branch and updates last-successful-build tag for the changed opted-in project") {
+    test("creates release branch and updates last-successful-build tag for the changed opted-in project") {
         // given
         val project = StandardReleaseTestProject.createMultiProjectAndInitialize(testListener.getTestProjectDir())
         project.createTag("monorepo/last-successful-build")
@@ -92,10 +92,10 @@ class ReleaseChangedFunctionalTest : FunSpec({
 
         // then
         result.task(":releaseChanged")?.outcome shouldBe TaskOutcome.SUCCESS
-        project.remoteTags() shouldContain "release/app/v0.1.0"
         project.remoteBranches() shouldContain "release/app/v0.1.x"
-        project.remoteTags().filter { it.startsWith("release/lib/") } shouldBe emptyList()
         project.remoteBranches().filter { it.startsWith("release/lib/") } shouldBe emptyList()
+        // no tags created — tagging is delegated to the release task on the branch
+        project.remoteTags().filter { it.startsWith("release/app/") } shouldBe emptyList()
         project.remoteTagCommit("monorepo/last-successful-build") shouldBe headCommit
     }
 
@@ -103,7 +103,7 @@ class ReleaseChangedFunctionalTest : FunSpec({
     // Both projects changed
     // ─────────────────────────────────────────────────────────────
 
-    test("creates tags and branches for all changed opted-in projects") {
+    test("creates release branches for all changed opted-in projects") {
         // given
         val project = StandardReleaseTestProject.createMultiProjectAndInitialize(testListener.getTestProjectDir())
         project.createTag("monorepo/last-successful-build")
@@ -116,34 +116,10 @@ class ReleaseChangedFunctionalTest : FunSpec({
 
         // then
         result.task(":releaseChanged")?.outcome shouldBe TaskOutcome.SUCCESS
-        project.remoteTags() shouldContain "release/app/v0.1.0"
-        project.remoteTags() shouldContain "release/lib/v0.1.0"
         project.remoteBranches() shouldContain "release/app/v0.1.x"
         project.remoteBranches() shouldContain "release/lib/v0.1.x"
-    }
-
-    // ─────────────────────────────────────────────────────────────
-    // Writes release-version.txt per subproject
-    // ─────────────────────────────────────────────────────────────
-
-    test("writes release-version.txt per subproject after successful release") {
-        // given
-        val project = StandardReleaseTestProject.createMultiProjectAndInitialize(testListener.getTestProjectDir())
-        project.createTag("monorepo/last-successful-build")
-        project.pushTag("monorepo/last-successful-build")
-        project.modifyFile("app/app.txt", "changed")
-        project.modifyFile("lib/lib.txt", "changed")
-        project.commitAll("Change both")
-
-        // when
-        val result = project.runTask("releaseChanged")
-
-        // then
-        result.task(":releaseChanged")?.outcome shouldBe TaskOutcome.SUCCESS
-        project.releaseVersionFile() shouldBe "0.1.0"
-        val libVersionFile = java.io.File(project.projectDir, "lib/build/release-version.txt")
-        libVersionFile.exists() shouldBe true
-        libVersionFile.readText().trim() shouldBe "0.1.0"
+        // no tags created
+        project.remoteTags().filter { it.startsWith("release/") } shouldBe emptyList()
     }
 
     // ─────────────────────────────────────────────────────────────
@@ -169,16 +145,15 @@ class ReleaseChangedFunctionalTest : FunSpec({
         project.pushToRemote()
 
         // Now: tag = commit B, origin/main = HEAD = commit C
-        // If using tag: app changed (diff B..C) → release for app
+        // If using tag: app changed (diff B..C) → release branch for app
         // If using origin/main: nothing changed (diff C..C) → no releases
 
         // when
         val result = project.runTask("releaseChanged")
 
-        // then: proves the tag is used — app has a release tag
+        // then: proves the tag is used — app has a release branch
         result.task(":releaseChanged")?.outcome shouldBe TaskOutcome.SUCCESS
         result.output shouldContain "Change detection baseline: monorepo/last-successful-build ("
-        project.remoteTags() shouldContain "release/app/v0.1.0"
         project.remoteBranches() shouldContain "release/app/v0.1.x"
     }
 
@@ -212,7 +187,6 @@ class ReleaseChangedFunctionalTest : FunSpec({
 
         // then: proves the tag was fetched from remote and used as baseline
         result.task(":releaseChanged")?.outcome shouldBe TaskOutcome.SUCCESS
-        project.remoteTags() shouldContain "release/app/v0.1.0"
         project.remoteBranches() shouldContain "release/app/v0.1.x"
     }
 
@@ -255,9 +229,7 @@ class ReleaseChangedFunctionalTest : FunSpec({
 
         // then
         result.task(":releaseChanged")?.outcome shouldBe TaskOutcome.SUCCESS
-        project.remoteTags() shouldContain "release/app/v0.1.0"
         project.remoteBranches() shouldContain "release/app/v0.1.x"
-        project.remoteTags().filter { it.startsWith("release/lib/") } shouldBe emptyList()
         project.remoteBranches().filter { it.startsWith("release/lib/") } shouldBe emptyList()
     }
 
@@ -265,7 +237,7 @@ class ReleaseChangedFunctionalTest : FunSpec({
     // Scope override
     // ─────────────────────────────────────────────────────────────
 
-    test("primaryBranchScope=major creates v1.0.0 tags and v1.0.x branches when prior v0.x.x tags exist") {
+    test("primaryBranchScope=major creates v1.0.x branches when prior v0.x.x tags exist") {
         // given
         val project = StandardReleaseTestProject.createMultiProjectAndInitialize(
             testListener.getTestProjectDir(),
@@ -285,8 +257,6 @@ class ReleaseChangedFunctionalTest : FunSpec({
 
         // then
         result.task(":releaseChanged")?.outcome shouldBe TaskOutcome.SUCCESS
-        project.remoteTags() shouldContain "release/app/v1.0.0"
-        project.remoteTags() shouldContain "release/lib/v1.0.0"
         project.remoteBranches() shouldContain "release/app/v1.0.x"
         project.remoteBranches() shouldContain "release/lib/v1.0.x"
     }
@@ -310,77 +280,72 @@ class ReleaseChangedFunctionalTest : FunSpec({
 
         // then: next minor is v0.2.0
         result.task(":releaseChanged")?.outcome shouldBe TaskOutcome.SUCCESS
-        project.remoteTags() shouldContain "release/app/v0.2.0"
         project.remoteBranches() shouldContain "release/app/v0.2.x"
     }
 
     // ─────────────────────────────────────────────────────────────
-    // Skips projects whose branch already exists on remote
+    // Branch scanning — bumps past existing branches
     // ─────────────────────────────────────────────────────────────
 
-    test("skips projects whose release branch already exists on remote") {
-        // given: simulate a prior releaseChanged run that pushed tags and branches
-        // but the lastSuccessfulBuildTag update did not complete.
-        // Manually create the release refs that would have been pushed.
+    test("second run creates higher version branch when first release has not completed") {
+        // given: simulate a prior releaseChanged run that created branch v0.1.x
+        // but the release task hasn't run yet (no tag) and the tag updater failed.
         val project = StandardReleaseTestProject.createMultiProjectAndInitialize(testListener.getTestProjectDir())
-        project.createTag("monorepo/last-successful-build")
-        project.pushTag("monorepo/last-successful-build")
-        project.modifyFile("app/app.txt", "changed")
-        project.modifyFile("lib/lib.txt", "changed")
-        project.commitAll("Change both")
 
-        // Manually create the release refs on remote (simulating a prior atomic push)
-        // No prior tags → forMainBranch(null, MINOR) → v0.1.0, branch → v0.1.x
-        project.createTag("release/app/v0.1.0")
-        project.pushTag("release/app/v0.1.0")
-        project.createTag("release/lib/v0.1.0")
-        project.pushTag("release/lib/v0.1.0")
+        // Manually push branch v0.1.x to simulate a prior releaseChanged run
         project.createBranch("release/app/v0.1.x")
         project.executeGitPush("release/app/v0.1.x")
         project.checkoutBranch("main")
-        project.createBranch("release/lib/v0.1.x")
-        project.executeGitPush("release/lib/v0.1.x")
+
+        // Tag is still at the old position (tag updater failed)
+        project.createTag("monorepo/last-successful-build")
+        project.pushTag("monorepo/last-successful-build")
+        project.modifyFile("app/app.txt", "changed")
+        project.commitAll("Change app")
+
+        // when: branch scanning finds v0.1.x → baseline v0.1.0 → next v0.2.0
+        val result = project.runTask("releaseChanged")
+
+        // then: creates v0.2.x (not v0.1.x again)
+        result.task(":releaseChanged")?.outcome shouldBe TaskOutcome.SUCCESS
+        project.remoteBranches() shouldContain "release/app/v0.2.x"
+    }
+
+    test("bumps version past both existing branch and tag") {
+        // given: app has completed release cycle at v0.1.0 (tag + branch exist)
+        // and a second releaseChanged created v0.2.x branch (release not yet completed, no v0.2.0 tag)
+        val project = StandardReleaseTestProject.createMultiProjectAndInitialize(testListener.getTestProjectDir())
+
+        // Set up completed prior release: tag + branch at v0.1
+        project.createTag("release/app/v0.1.0")
+        project.pushTag("release/app/v0.1.0")
+        project.createBranch("release/app/v0.1.x")
+        project.executeGitPush("release/app/v0.1.x")
         project.checkoutBranch("main")
 
-        // Now tags v0.1.0 exist, so next version = v0.2.0, branch = v0.2.x.
-        // Those don't exist on remote, so projects won't be skipped — they'll get v0.2.0.
-        // That's correct: the prior run already created v0.1.0, so the next run creates v0.2.0.
-        // To test the skip, we also need v0.2.x branches on remote.
-        project.createTag("release/app/v0.2.0")
-        project.pushTag("release/app/v0.2.0")
-        project.createTag("release/lib/v0.2.0")
-        project.pushTag("release/lib/v0.2.0")
+        // Set up in-flight release: branch at v0.2.x but no v0.2.0 tag
         project.createBranch("release/app/v0.2.x")
         project.executeGitPush("release/app/v0.2.x")
         project.checkoutBranch("main")
-        project.createBranch("release/lib/v0.2.x")
-        project.executeGitPush("release/lib/v0.2.x")
-        project.checkoutBranch("main")
 
-        // Now: findLatestVersion → v0.2.0 for both, next → v0.3.0, branch → v0.3.x.
-        // v0.3.x doesn't exist → not skipped. This cascading makes it hard to test skip
-        // with real tag scanning. Instead, verify at integration test level and just test
-        // that the task handles the "all skipped" case gracefully here.
-        project.createBranch("release/app/v0.3.x")
-        project.executeGitPush("release/app/v0.3.x")
-        project.checkoutBranch("main")
-        project.createBranch("release/lib/v0.3.x")
-        project.executeGitPush("release/lib/v0.3.x")
-        project.checkoutBranch("main")
+        project.createTag("monorepo/last-successful-build")
+        project.pushTag("monorepo/last-successful-build")
+        project.modifyFile("app/app.txt", "changed")
+        project.commitAll("Change app")
 
-        // when: findLatestVersion → v0.2.0, next → v0.3.0, branch → v0.3.x — exists → skip
+        // when: max(tag v0.1.0, branch v0.2.0) = v0.2.0 → next v0.3.0
         val result = project.runTask("releaseChanged")
 
-        // then: task succeeds; skips both projects
+        // then
         result.task(":releaseChanged")?.outcome shouldBe TaskOutcome.SUCCESS
-        result.output shouldContain "already exists on remote"
+        project.remoteBranches() shouldContain "release/app/v0.3.x"
     }
 
     // ─────────────────────────────────────────────────────────────
     // Rollback on local branch collision
     // ─────────────────────────────────────────────────────────────
 
-    test("rolls back all local refs and does not update tag when one already exists locally") {
+    test("rolls back all local branches and does not update tag when one already exists locally") {
         // given: pre-create a local branch for app so creation fails
         val project = StandardReleaseTestProject.createMultiProjectAndInitialize(testListener.getTestProjectDir())
         project.createTag("monorepo/last-successful-build")
@@ -395,10 +360,8 @@ class ReleaseChangedFunctionalTest : FunSpec({
         // when
         val result = project.runTaskAndFail("releaseChanged")
 
-        // then: task fails; neither tag nor branch pushed; last-successful-build tag not updated
+        // then: task fails; no branches pushed; last-successful-build tag not updated
         result.output shouldContain "already exists locally"
-        project.remoteTags().filter { it.startsWith("release/app/") } shouldBe emptyList()
-        project.remoteTags().filter { it.startsWith("release/lib/") } shouldBe emptyList()
         project.remoteBranches() shouldNotContain "release/app/v0.1.x"
         project.remoteBranches() shouldNotContain "release/lib/v0.1.x"
         project.remoteTagCommit("monorepo/last-successful-build") shouldBe tagCommitBefore
@@ -447,21 +410,49 @@ class ReleaseChangedFunctionalTest : FunSpec({
     // No tag — all projects treated as changed
     // ─────────────────────────────────────────────────────────────
 
-    test("creates releases for all opted-in projects when tag does not exist") {
+    test("creates release branches for all opted-in projects when tag does not exist") {
         // given: no tag — all projects treated as changed (no baseline)
         val project = StandardReleaseTestProject.createMultiProjectAndInitialize(testListener.getTestProjectDir())
 
         // when
         val result = project.runTask("releaseChanged")
 
-        // then: no baseline, all projects treated as changed, releases created
+        // then: no baseline, all projects treated as changed, release branches created
         result.task(":releaseChanged")?.outcome shouldBe TaskOutcome.SUCCESS
         result.output shouldContain "no baseline exists"
         result.output shouldContain "Change detection baseline: none (all projects treated as changed)"
-        project.remoteTags() shouldContain "release/app/v0.1.0"
-        project.remoteTags() shouldContain "release/lib/v0.1.0"
         project.remoteBranches() shouldContain "release/app/v0.1.x"
         project.remoteBranches() shouldContain "release/lib/v0.1.x"
+        // no tags created — tagging is delegated to release task on the branch
+        project.remoteTags().filter { it.startsWith("release/") } shouldBe emptyList()
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    // End-to-end handoff: releaseChanged → release
+    // ─────────────────────────────────────────────────────────────
+
+    test("releaseChanged creates branch, then release task on that branch creates tag") {
+        // given: releaseChanged creates branch release/app/v0.1.x (no tag)
+        val project = StandardReleaseTestProject.createMultiProjectAndInitialize(testListener.getTestProjectDir())
+        project.createTag("monorepo/last-successful-build")
+        project.pushTag("monorepo/last-successful-build")
+        project.modifyFile("app/app.txt", "changed")
+        project.commitAll("Change app")
+
+        val releaseResult = project.runTask("releaseChanged")
+        releaseResult.task(":releaseChanged")?.outcome shouldBe TaskOutcome.SUCCESS
+        project.remoteBranches() shouldContain "release/app/v0.1.x"
+        // no tag created by releaseChanged
+        project.remoteTags().filter { it.startsWith("release/app/") } shouldBe emptyList()
+
+        // when: checkout the release branch and run :app:release
+        project.checkoutBranch("release/app/v0.1.x")
+        val result = project.runTask(":app:release")
+
+        // then: release task creates the version tag
+        result.task(":app:release")?.outcome shouldBe TaskOutcome.SUCCESS
+        project.remoteTags() shouldContain "release/app/v0.1.0"
+        project.releaseVersionFile() shouldBe "0.1.0"
     }
 
     // ─────────────────────────────────────────────────────────────

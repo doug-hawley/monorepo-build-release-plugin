@@ -8,35 +8,35 @@ import org.gradle.api.GradleException
 import org.gradle.api.logging.Logger
 
 /**
- * Two-phase atomic release creator for tags and branches.
+ * Creates release branches for changed projects.
  *
- * Phase 1: Create all tags and branches locally. If any local creation fails,
- *          roll back all previously created refs and fail.
- * Phase 2: Push all refs atomically with `git push --atomic`.
- *          If the push fails, delete all local refs and fail.
+ * Phase 1: Create all branches locally. If any local creation fails,
+ *          roll back all previously created branches and fail.
+ * Phase 2: Push all branches atomically with `git push --atomic`.
+ *          If the push fails, delete all local branches and fail.
+ *
+ * Tagging is delegated to the `release` task running on each release branch.
  */
-class AtomicReleaseCreator(
+class ReleaseBranchCreator(
     private val gitReleaseExecutor: GitReleaseExecutor,
     private val gitTagScanner: GitTagScanner,
     private val logger: Logger
 ) {
 
     data class ReleaseResult(
-        val createdTags: List<String>,
         val createdBranches: List<String>,
         val projectToVersion: Map<String, SemanticVersion>,
-        val projectToTag: Map<String, String>,
         val projectToBranch: Map<String, String>
     )
 
     /**
-     * Creates version tags and release branches for the given projects atomically.
+     * Creates release branches for the given projects atomically.
      *
      * @param projects map of Gradle project path to its resolved tag prefix
      * @param globalPrefix the global tag prefix (e.g., "release")
      * @param scope the version bump scope (major or minor)
-     * @return the result containing created tags, branches, and version mappings
-     * @throws GradleException if any phase fails (all local refs are rolled back)
+     * @return the result containing created branches and version mappings
+     * @throws GradleException if any phase fails (all local branches are rolled back)
      */
     fun releaseProjects(
         projects: Map<String, String>,
@@ -45,15 +45,14 @@ class AtomicReleaseCreator(
     ): ReleaseResult {
         if (projects.isEmpty()) {
             logger.lifecycle("No opted-in changed projects — nothing to release")
-            return ReleaseResult(emptyList(), emptyList(), emptyMap(), emptyMap(), emptyMap())
+            return ReleaseResult(emptyList(), emptyMap(), emptyMap())
         }
 
         val allResolved = resolveReleases(projects, globalPrefix, scope)
 
         // Skip projects whose release branch already exists on remote.
-        // Since tags and branches are pushed atomically, if the branch exists
-        // the tag does too — this covers the case where a prior run's atomic push
-        // succeeded but the lastSuccessfulBuildTag update failed afterward.
+        // This covers the case where a prior run's atomic push succeeded
+        // but the lastSuccessfulBuildTag update failed afterward.
         val filtered = allResolved.filterNot { (projectPath, resolved) ->
             val exists = gitReleaseExecutor.branchExistsOnRemote(resolved.branch)
             if (exists) {
@@ -67,20 +66,14 @@ class AtomicReleaseCreator(
 
         if (filtered.isEmpty()) {
             logger.warn("All releases already exist on remote — nothing to create")
-            return ReleaseResult(emptyList(), emptyList(), emptyMap(), emptyMap(), emptyMap())
+            return ReleaseResult(emptyList(), emptyMap(), emptyMap())
         }
 
-        val tags = filtered.values.map { it.tag }
         val branches = filtered.values.map { it.branch }
 
-        // Phase 1: Create all tags and branches locally
-        val createdTags = mutableListOf<String>()
+        // Phase 1: Create all branches locally
         val createdBranches = mutableListOf<String>()
         try {
-            for (resolved in filtered.values) {
-                gitReleaseExecutor.createTagLocally(resolved.tag)
-                createdTags.add(resolved.tag)
-            }
             for (resolved in filtered.values) {
                 if (gitReleaseExecutor.branchExistsLocally(resolved.branch)) {
                     throw GradleException(
@@ -92,36 +85,33 @@ class AtomicReleaseCreator(
                 createdBranches.add(resolved.branch)
             }
         } catch (e: Exception) {
-            logger.error("Local ref creation failed, rolling back ${createdTags.size} tag(s) and ${createdBranches.size} branch(es): ${e.message}")
-            rollbackLocalRefs(createdTags, createdBranches)
-            throw GradleException("Failed to create release refs locally: ${e.message}", e)
+            logger.error("Local branch creation failed, rolling back ${createdBranches.size} branch(es): ${e.message}")
+            rollbackLocalBranches(createdBranches)
+            throw GradleException("Failed to create release branches locally: ${e.message}", e)
         }
 
-        // Phase 2: Push all refs atomically
+        // Phase 2: Push all branches atomically
         try {
-            gitReleaseExecutor.pushRefsAtomically(tags + branches)
+            gitReleaseExecutor.pushBranchesAtomically(branches)
         } catch (e: Exception) {
-            logger.error("Atomic push failed, rolling back ${createdTags.size} tag(s) and ${createdBranches.size} local branch(es): ${e.message}")
-            rollbackLocalRefs(createdTags, createdBranches)
-            throw GradleException("Atomic push of release refs failed: ${e.message}", e)
+            logger.error("Atomic push failed, rolling back ${createdBranches.size} local branch(es): ${e.message}")
+            rollbackLocalBranches(createdBranches)
+            throw GradleException("Atomic push of release branches failed: ${e.message}", e)
         }
 
         filtered.forEach { (projectPath, resolved) ->
-            logger.lifecycle("Released $projectPath as ${resolved.version} (tag: ${resolved.tag}, branch: ${resolved.branch})")
+            logger.lifecycle("Created release branch for $projectPath: ${resolved.branch} (version line ${resolved.version.major}.${resolved.version.minor}.x)")
         }
 
         return ReleaseResult(
-            createdTags = tags,
             createdBranches = branches,
             projectToVersion = filtered.mapValues { it.value.version },
-            projectToTag = filtered.mapValues { it.value.tag },
             projectToBranch = filtered.mapValues { it.value.branch }
         )
     }
 
     private data class ResolvedRelease(
         val version: SemanticVersion,
-        val tag: String,
         val branch: String
     )
 
@@ -131,20 +121,26 @@ class AtomicReleaseCreator(
         scope: Scope
     ): Map<String, ResolvedRelease> {
         return projects.mapValues { (_, projectPrefix) ->
-            val latestVersion = gitTagScanner.findLatestVersion(globalPrefix, projectPrefix)
+            val latestTagVersion = gitTagScanner.findLatestVersion(globalPrefix, projectPrefix)
+            val latestBranchVersion = gitTagScanner.findLatestBranchVersion(globalPrefix, projectPrefix)
+            val latestVersion = maxOfNullable(latestTagVersion, latestBranchVersion)
             val nextVersion = NextVersionResolver.forMainBranch(latestVersion, scope)
             ResolvedRelease(
                 version = nextVersion,
-                tag = TagPattern.formatTag(globalPrefix, projectPrefix, nextVersion),
                 branch = TagPattern.formatReleaseBranch(globalPrefix, projectPrefix, nextVersion)
             )
         }
     }
 
-    private fun rollbackLocalRefs(tags: List<String>, branches: List<String>) {
-        tags.forEach { tag ->
-            gitReleaseExecutor.deleteLocalTag(tag)
+    private fun <T : Comparable<T>> maxOfNullable(a: T?, b: T?): T? {
+        return when {
+            a == null -> b
+            b == null -> a
+            else -> maxOf(a, b)
         }
+    }
+
+    private fun rollbackLocalBranches(branches: List<String>) {
         branches.forEach { branch ->
             gitReleaseExecutor.deleteLocalBranch(branch)
         }

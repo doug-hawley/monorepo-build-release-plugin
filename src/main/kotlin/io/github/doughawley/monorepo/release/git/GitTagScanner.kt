@@ -46,6 +46,21 @@ class GitTagScanner(
     }
 
     /**
+     * Returns the highest version line (as major.minor.0) found among remote release branches
+     * for the given project, or null if no matching branches exist on the remote.
+     *
+     * For example, if branches `release/app/v0.1.x` and `release/app/v0.2.x` exist,
+     * returns SemanticVersion(0, 2, 0).
+     */
+    fun findLatestBranchVersion(globalPrefix: String, projectPrefix: String): SemanticVersion? {
+        val refPattern = "refs/heads/$globalPrefix/$projectPrefix/v*"
+        val lines = executor.executeForOutput(rootDir, "ls-remote", "--heads", "origin", refPattern)
+        return lines
+            .mapNotNull { parseBranchFromLsRemoteLine(it, globalPrefix, projectPrefix) }
+            .maxOrNull()
+    }
+
+    /**
      * Returns true if the given tag exists in the local repository.
      * Uses local tag lookup only — a tag that exists on the remote but has not been fetched
      * locally will return false.
@@ -53,6 +68,18 @@ class GitTagScanner(
     fun tagExists(tag: String): Boolean {
         val output = executor.executeForOutput(rootDir, "tag", "-l", tag)
         return output.isNotEmpty()
+    }
+
+    private fun parseBranchFromLsRemoteLine(line: String, globalPrefix: String, projectPrefix: String): SemanticVersion? {
+        // ls-remote output format: "<sha>\trefs/heads/<branchname>"
+        val branchName = line.substringAfter("refs/heads/").trim()
+        val expectedPrefix = "$globalPrefix/$projectPrefix/v"
+        if (!branchName.startsWith(expectedPrefix)) return null
+        val versionPart = branchName.removePrefix(expectedPrefix)
+        val match = Regex("^(\\d+)\\.(\\d+)\\.x$").matchEntire(versionPart) ?: return null
+        val major = match.groupValues[1].toIntOrNull() ?: return null
+        val minor = match.groupValues[2].toIntOrNull() ?: return null
+        return SemanticVersion(major, minor, 0)
     }
 
     private fun parseTagFromLsRemoteLine(line: String, globalPrefix: String, projectPrefix: String): SemanticVersion? {

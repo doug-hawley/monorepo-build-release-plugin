@@ -290,6 +290,14 @@ class ReleaseTestProject(
         executeCommand("git", "tag", "-d", tag)
     }
 
+    fun deleteLocalBranch(branch: String) {
+        executeCommand("git", "branch", "-D", branch)
+    }
+
+    fun forcePushTag(tag: String) {
+        executeCommand("git", "push", "--force", "origin", tag)
+    }
+
     fun localTags(): List<String> {
         val process = ProcessBuilder("git", "tag", "-l")
             .directory(projectDir)

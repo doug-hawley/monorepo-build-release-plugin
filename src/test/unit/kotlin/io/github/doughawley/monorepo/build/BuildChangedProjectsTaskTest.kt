@@ -32,6 +32,6 @@ class BuildChangedProjectsTaskTest : FunSpec({
         val task = project.tasks.findByName("releaseChanged")
         task shouldNotBe null
         task?.group shouldBe "monorepo"
-        task?.description shouldBe "Builds, tags, and creates release branches for changed projects"
+        task?.description shouldBe "Builds changed projects and creates release branches"
     }
 })

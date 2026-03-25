@@ -12,7 +12,7 @@ import io.github.doughawley.monorepo.release.MonorepoReleaseConfigExtension
 import io.github.doughawley.monorepo.release.MonorepoReleaseExtension
 import io.github.doughawley.monorepo.release.domain.Scope
 import io.github.doughawley.monorepo.release.domain.TagPattern
-import io.github.doughawley.monorepo.release.git.AtomicReleaseCreator
+import io.github.doughawley.monorepo.release.git.ReleaseBranchCreator
 import io.github.doughawley.monorepo.release.task.ReleaseTask
 import io.github.doughawley.monorepo.git.GitCommandExecutor
 import io.github.doughawley.monorepo.release.git.GitReleaseExecutor
@@ -143,7 +143,7 @@ class MonorepoBuildReleasePlugin : Plugin<Project> {
 
         project.tasks.register("releaseChanged").configure {
             group = TASK_GROUP
-            description = "Builds, tags, and creates release branches for changed projects"
+            description = "Builds changed projects and creates release branches"
             dependsOn("buildChanged")
             val buildExt = rootBuildExtension
             val releaseExt = rootReleaseExtension
@@ -206,21 +206,10 @@ class MonorepoBuildReleasePlugin : Plugin<Project> {
                     )
                 }
 
-                // Atomic tag + branch creation
+                // Create release branches
                 val tagScanner = GitTagScanner(rootDir, executor)
-                val releaseCreator = AtomicReleaseCreator(releaseExecutor, tagScanner, logger)
-                val result = releaseCreator.releaseProjects(optedInProjects, releaseExt.globalTagPrefix, scope)
-
-                // Write release-version.txt per subproject
-                result.projectToVersion.forEach { (projectPath, version) ->
-                    val targetProject = rootProject.findProject(projectPath) ?: return@forEach
-                    val versionFile = targetProject.layout.buildDirectory
-                        .file("release-version.txt").get().asFile
-                    versionFile.parentFile.mkdirs()
-                    versionFile.writeText(version.toString())
-                    val relativePath = rootProject.rootDir.toPath().relativize(versionFile.toPath())
-                    logger.lifecycle("Wrote release version to: $relativePath")
-                }
+                val releaseCreator = ReleaseBranchCreator(releaseExecutor, tagScanner, logger)
+                releaseCreator.releaseProjects(optedInProjects, releaseExt.globalTagPrefix, scope)
 
                 // Update last-successful-build tag
                 tagUpdater.updateTag(buildExt.lastSuccessfulBuildTag)
