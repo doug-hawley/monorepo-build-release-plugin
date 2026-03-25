@@ -128,6 +128,70 @@ class GitTagScannerTest : FunSpec({
         result shouldBe SemanticVersion(0, 1, 7)
     }
 
+    // findLatestBranchVersion
+
+    test("findLatestBranchVersion returns null when remote has no matching branches") {
+        // given
+        every {
+            executor.executeForOutput(rootDir, "ls-remote", "--heads", "origin", "refs/heads/release/app/v*")
+        } returns emptyList()
+
+        // when
+        val result = scanner.findLatestBranchVersion("release", "app")
+
+        // then
+        result.shouldBeNull()
+    }
+
+    test("findLatestBranchVersion returns the maximum version from ls-remote branch output") {
+        // given
+        val lines = listOf(
+            "abc123\trefs/heads/release/app/v0.1.x",
+            "def456\trefs/heads/release/app/v0.3.x",
+            "ghi789\trefs/heads/release/app/v0.2.x",
+        )
+        every {
+            executor.executeForOutput(rootDir, "ls-remote", "--heads", "origin", "refs/heads/release/app/v*")
+        } returns lines
+
+        // when
+        val result = scanner.findLatestBranchVersion("release", "app")
+
+        // then
+        result shouldBe SemanticVersion(0, 3, 0)
+    }
+
+    test("findLatestBranchVersion ignores malformed branch names") {
+        // given
+        val lines = listOf(
+            "abc123\trefs/heads/release/app/v1.0.x",
+            "bad-line-with-no-tab",
+            "abc123\trefs/heads/release/app/not-a-version",
+        )
+        every {
+            executor.executeForOutput(rootDir, "ls-remote", "--heads", "origin", "refs/heads/release/app/v*")
+        } returns lines
+
+        // when
+        val result = scanner.findLatestBranchVersion("release", "app")
+
+        // then
+        result shouldBe SemanticVersion(1, 0, 0)
+    }
+
+    test("findLatestBranchVersion uses globalPrefix and projectPrefix in the ref pattern") {
+        // given
+        every {
+            executor.executeForOutput(rootDir, "ls-remote", "--heads", "origin", "refs/heads/custom/my-svc/v*")
+        } returns listOf("abc123\trefs/heads/custom/my-svc/v2.3.x")
+
+        // when
+        val result = scanner.findLatestBranchVersion("custom", "my-svc")
+
+        // then
+        result shouldBe SemanticVersion(2, 3, 0)
+    }
+
     // tagExists
 
     test("tagExists returns true when local tag list is non-empty") {
