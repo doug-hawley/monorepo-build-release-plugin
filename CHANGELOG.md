@@ -4,6 +4,13 @@ All notable changes to this project will be documented in this file.
 
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.4.3](https://github.com/doug-hawley/monorepo-build-release-plugin/compare/v0.4.2...v0.4.3) (2026-03-26)
+
+
+### Features
+
+* replace AtomicReleaseCreator with ReleaseBranchCreator ([e3898b6](https://github.com/doug-hawley/monorepo-build-release-plugin/commit/e3898b6de2f4e4f1a3d13cb88486b61da7bbe044))
+
 ## [0.4.2](https://github.com/doug-hawley/monorepo-build-release-plugin/compare/v0.4.1...v0.4.2) (2026-03-23)
 
 
