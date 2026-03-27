@@ -100,7 +100,14 @@ class GitCommandExecutor(private val logger: Logger) {
             }
             val exitCode = process.waitFor()
 
+            val commandString = fullCommand.joinToString(" ")
             if (exitCode == 0) {
+                if (silent) {
+                    logger.debug("$ $commandString → exit 0 (${output.size} lines)")
+                } else {
+                    logger.info("$ $commandString → exit 0 (${output.size} lines)")
+                }
+                output.forEach { line -> logger.debug("  $line") }
                 CommandResult(
                     success = true,
                     output = output,
@@ -109,10 +116,11 @@ class GitCommandExecutor(private val logger: Logger) {
             } else {
                 val errorOutput = output.joinToString("\n")
                 if (silent) {
-                    logger.debug("Git command exited with code $exitCode: ${fullCommand.joinToString(" ")}")
-                    logger.debug("Output: $errorOutput")
+                    logger.debug("$ $commandString → exit $exitCode")
+                    logger.debug("  $errorOutput")
                 } else {
-                    logger.warn("Git command failed with exit code $exitCode: ${fullCommand.joinToString(" ")}")
+                    logger.info("$ $commandString → exit $exitCode")
+                    logger.warn("Git command failed: $commandString")
                     logger.warn("Error output: $errorOutput")
                 }
 
