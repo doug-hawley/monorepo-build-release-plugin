@@ -130,13 +130,13 @@ monorepo {
 
 #### `releaseChanged`
 
-The CI post-merge task. Depends on `buildChanged` to build all affected projects first, then creates version tags and release branches atomically for changed opted-in projects, writes `release-version.txt` per subproject, and updates the last-successful-build tag. Fails fast if the current branch is not `primaryBranch`.
+The CI post-merge task. Depends on `buildChanged` to build all affected projects first, then creates release branches atomically for changed opted-in projects and updates the last-successful-build tag. Fails fast if the current branch is not `primaryBranch`.
 
 ```bash
 ./gradlew releaseChanged
 ```
 
-Tags and release branches are created using a two-phase atomic approach: all refs are created locally first, then pushed together via `git push --atomic`. If any step fails, all local refs are rolled back and the tag is not updated. Release branches are created alongside tags for future patch releases.
+Release branches are created using a two-phase atomic approach: all branches are created locally first, then pushed together via `git push --atomic`. If any step fails, all local branches are rolled back and the tag is not updated. Tagging is delegated to the `:subproject:release` task running on each release branch.
 
 #### `:subproject:release`
 
@@ -240,14 +240,14 @@ The PR is merged into `main` and CI triggers on the merge commit. The plugin com
 ./gradlew releaseChanged
 ```
 
-`:shared-module` changed, so both apps are included via transitive impact. `:shared-module` itself is skipped because it isn't opted in to releases. The task builds all affected projects, creates version tags and release branches atomically, writes `release-version.txt`, and updates the last-successful-build tag — all in one step.
+`:shared-module` changed, so both apps are included via transitive impact. `:shared-module` itself is skipped because it isn't opted in to releases. The task builds all affected projects, creates release branches atomically, and updates the last-successful-build tag — all in one step.
 
-| Project | Tag created | Release branch created |
-|---------|-------------|------------------------|
-| `:app1` | `release/app1/v0.1.0` | `release/app1/v0.1.x`  |
-| `:app2` | `release/app2/v0.1.0` | `release/app2/v0.1.x`  |
+| Project | Release branch created |
+|---------|------------------------|
+| `:app1` | `release/app1/v0.1.x`  |
+| `:app2` | `release/app2/v0.1.x`  |
 
-The `releaseChanged` task writes the released version to `build/release-version.txt` per subproject, which your CI/CD pipeline can read for publishing:
+Tagging is delegated to the `:subproject:release` task. When that task runs on a release branch, it creates the version tag and writes `build/release-version.txt`, which your CI/CD pipeline can read for publishing:
 
 ```bash
 VERSION=$(cat app1/build/release-version.txt)
@@ -305,7 +305,7 @@ ruleset:
   tag: "release/*/v*"    # only version tags, not monorepo/last-successful-build
 ```
 
-Since `releaseChanged` writes `release-version.txt` per subproject, your publish step can read the version directly:
+Since the `release` task writes `release-version.txt` per subproject, your publish step can read the version directly:
 
 ```yaml
 steps:
@@ -339,7 +339,7 @@ jobs:
       - run: ./gradlew releaseChanged
 ```
 
-> **Note:** `releaseChanged` creates version tags, release branches, and writes `release-version.txt` — all in one step. No separate release branch pipeline is needed for the initial release. Release branches exist for future patch releases only.
+> **Note:** `releaseChanged` creates release branches and updates the last-successful-build tag. Tagging and `release-version.txt` are handled by the `:subproject:release` task on each release branch. A separate release branch workflow (below) is needed to create version tags.
 
 #### Workflow for patch releases from release branches
 
