@@ -415,7 +415,7 @@ class ReleaseTaskFunctionalTest : FunSpec({
         result.output shouldContain "Tag 'release/app/v0.1.1' already exists. This version has already been released."
     }
 
-    test("release task runs buildChanged and build before releasing") {
+    test("release task runs build before releasing") {
         // given
         val project = StandardReleaseTestProject.createAndInitialize(testListener.getTestProjectDir())
         project.createBranch("release/app/v0.1.x")
@@ -426,7 +426,6 @@ class ReleaseTaskFunctionalTest : FunSpec({
         val result = project.runTask(":app:release")
 
         // then
-        result.task(":app:buildChanged")?.outcome shouldBe TaskOutcome.SUCCESS
         result.task(":app:build")?.outcome shouldBe TaskOutcome.SUCCESS
         result.task(":app:release")?.outcome shouldBe TaskOutcome.SUCCESS
     }

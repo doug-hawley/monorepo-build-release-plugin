@@ -3,8 +3,10 @@ package io.github.doughawley.monorepo.build.functional
 import io.github.doughawley.monorepo.build.functional.StandardTestProject.Files
 import io.github.doughawley.monorepo.build.functional.StandardTestProject.Projects
 import io.kotest.core.spec.style.FunSpec
+import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.collections.shouldContain
 import io.kotest.matchers.collections.shouldContainAll
+import io.kotest.matchers.collections.shouldContainExactlyInAnyOrder
 import io.kotest.matchers.collections.shouldHaveSize
 import io.kotest.matchers.collections.shouldNotContain
 import io.kotest.matchers.shouldBe
@@ -49,12 +51,11 @@ class BuildChangedFunctionalTest : FunSpec({
 
         // then
         result.task(":buildChanged")?.outcome shouldBe TaskOutcome.SUCCESS
-        val builtProjects = result.extractBuiltProjects()
-        builtProjects shouldContainAll setOf(Projects.MODULE1, Projects.APP1)
-        builtProjects shouldNotContain Projects.APP2
+        result.extractExecutedBuildTasks() shouldContainExactlyInAnyOrder
+            listOf(Projects.MODULE1, Projects.APP1)
     }
 
-    test("buildChanged reports no changes when nothing modified") {
+    test("buildChanged does not execute any build tasks when nothing modified") {
         // given
         val project = testProjectListener.createStandardProject()
 
@@ -64,6 +65,7 @@ class BuildChangedFunctionalTest : FunSpec({
         // then
         result.task(":buildChanged")?.outcome shouldBe TaskOutcome.SUCCESS
         result.output shouldContain "No projects have changed - nothing to build"
+        result.extractExecutedBuildTasks().shouldBeEmpty()
     }
 
     test("buildChanged handles multiple independent app changes") {
@@ -107,12 +109,8 @@ class BuildChangedFunctionalTest : FunSpec({
 
         // then
         result.task(":buildChanged")?.outcome shouldBe TaskOutcome.SUCCESS
-        val builtProjects = result.extractBuiltProjects()
-        builtProjects shouldContain Projects.APP2
-        builtProjects shouldNotContain Projects.COMMON_LIB
-        builtProjects shouldNotContain Projects.MODULE1
-        builtProjects shouldNotContain Projects.MODULE2
-        builtProjects shouldNotContain Projects.APP1
+        result.extractExecutedBuildTasks() shouldContainExactlyInAnyOrder
+            listOf(Projects.APP2)
     }
 
     test("buildChanged builds projects affected by BOM changes") {

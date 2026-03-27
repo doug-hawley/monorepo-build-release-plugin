@@ -366,9 +366,9 @@ class MonorepoBuildReleasePlugin : Plugin<Project> {
         project.subprojects.forEach { sub ->
             val buildChangedTask = sub.tasks.findByName("buildChanged") ?: return@forEach
 
-            // Wire the project's own build task (skipped for grouping projects without build)
+            // Wire the project's own build task only when it has changes
             val ownBuildTask = sub.tasks.findByName("build")
-            if (ownBuildTask != null) {
+            if (ownBuildTask != null && affectedProjects.contains(sub.path)) {
                 buildChangedTask.dependsOn(ownBuildTask)
             }
 
@@ -491,7 +491,7 @@ class MonorepoBuildReleasePlugin : Plugin<Project> {
             this.projectPath = sub.path
             this.buildDir.set(sub.layout.buildDirectory)
             this.releaseScopeProperty = sub.findProperty("release.scope") as? String
-            dependsOn("buildChanged")
+            dependsOn("build", "buildChanged")
         }
     }
 

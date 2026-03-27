@@ -136,7 +136,7 @@ class PerProjectBuildChangedFunctionalTest : FunSpec({
         result.task(":modules:module2:build")?.outcome shouldBe TaskOutcome.SUCCESS
     }
 
-    test("per-project buildChanged ignores changes in unrelated projects") {
+    test("per-project buildChanged does not build when only unrelated projects changed") {
         // given: app2 changed but app1 does not depend on app2
         val project = testProjectListener.createStandardProject()
         project.appendToFile(Files.APP2_SOURCE, "\n// Modified")
@@ -145,9 +145,9 @@ class PerProjectBuildChangedFunctionalTest : FunSpec({
         // when
         val result = project.runTask(":apps:app1:buildChanged")
 
-        // then: only app1 is built (app2 is not a dep)
-        result.task(":apps:app1:buildChanged")?.outcome shouldBe TaskOutcome.SUCCESS
-        result.task(":apps:app1:build")?.outcome shouldBe TaskOutcome.SUCCESS
+        // then: app1 is not affected so nothing is built
+        result.task(":apps:app1:buildChanged")?.outcome shouldBe TaskOutcome.UP_TO_DATE
+        result.task(":apps:app1:build") shouldBe null
         result.task(":apps:app2:build") shouldBe null
         result.task(":modules:module1:build") shouldBe null
         result.task(":modules:module2:build") shouldBe null
