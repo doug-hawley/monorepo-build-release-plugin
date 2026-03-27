@@ -796,8 +796,9 @@ class ReleaseTaskFunctionalTest : FunSpec({
     // Upstream dependency testing via buildChanged
     // ─────────────────────────────────────────────────────────────
 
-    test("release tests changed upstream dependency via buildChanged") {
-        // given: :app depends on :lib, lib has changed since origin/main
+    test("release tests changed upstream deps and skips unchanged ones via buildChanged") {
+        // given: :app depends on :lib, both lib and app have changes since origin/main
+        //        :lib also depends on a new :core module that has NOT changed
         val projectDir = testListener.getTestProjectDir()
         val remoteDir = File(projectDir.parentFile, "${projectDir.name}-remote.git")
 
@@ -819,9 +820,26 @@ class ReleaseTaskFunctionalTest : FunSpec({
             rootProject.name = "test-project"
             include(":app")
             include(":lib")
+            include(":core")
             """.trimIndent()
         )
         File(projectDir, ".gitignore").writeText(".gradle/\n.kotlin/\nbuild/")
+
+        val coreDir = File(projectDir, "core")
+        coreDir.mkdirs()
+        File(coreDir, "build.gradle.kts").writeText(
+            """
+            plugins {
+                kotlin("jvm") version "2.0.21"
+            }
+            """.trimIndent()
+        )
+        File(File(coreDir, "src/main/kotlin/com/example").apply { mkdirs() }, "Core.kt").writeText(
+            """
+            package com.example
+            class Core { fun id() = "core" }
+            """.trimIndent()
+        )
 
         val libDir = File(projectDir, "lib")
         libDir.mkdirs()
@@ -830,12 +848,15 @@ class ReleaseTaskFunctionalTest : FunSpec({
             plugins {
                 kotlin("jvm") version "2.0.21"
             }
+            dependencies {
+                implementation(project(":core"))
+            }
             """.trimIndent()
         )
         File(File(libDir, "src/main/kotlin/com/example").apply { mkdirs() }, "Lib.kt").writeText(
             """
             package com.example
-            class Lib { fun greet() = "Hello" }
+            class Lib { fun greet() = Core().id() }
             """.trimIndent()
         )
 
@@ -868,11 +889,11 @@ class ReleaseTaskFunctionalTest : FunSpec({
         project.commitAll("Initial commit")
         project.pushToRemote()
 
-        // Make a change to lib after the baseline
+        // Change lib after the baseline (core stays unchanged)
         File(File(libDir, "src/main/kotlin/com/example"), "Lib.kt").writeText(
             """
             package com.example
-            class Lib { fun greet() = "Hello World" }
+            class Lib { fun greet() = Core().id() + " updated" }
             """.trimIndent()
         )
         project.commitAll("Change lib")
@@ -883,106 +904,12 @@ class ReleaseTaskFunctionalTest : FunSpec({
         // when
         val result = project.runTask(":app:release")
 
-        // then: release succeeds and lib was fully built (not just assembled)
+        // then: release succeeds, changed dep (lib) was fully built, unchanged dep (core) was not
         result.task(":app:release")?.outcome shouldBe TaskOutcome.SUCCESS
         result.task(":app:buildChanged")?.outcome shouldBe TaskOutcome.SUCCESS
         result.task(":app:build")?.outcome shouldBe TaskOutcome.SUCCESS
         result.task(":lib:build")?.outcome shouldBe TaskOutcome.SUCCESS
-        project.remoteTags() shouldContain "release/app/v0.1.0"
-    }
-
-    test("release does not test unchanged upstream dependency") {
-        // given: :app depends on :lib, but lib has NOT changed since origin/main
-        val projectDir = testListener.getTestProjectDir()
-        val remoteDir = File(projectDir.parentFile, "${projectDir.name}-remote.git")
-
-        File(projectDir, "build.gradle.kts").writeText(
-            """
-            plugins {
-                id("io.github.doug-hawley.monorepo-build-release-plugin")
-            }
-
-            allprojects {
-                repositories {
-                    mavenCentral()
-                }
-            }
-            """.trimIndent()
-        )
-        File(projectDir, "settings.gradle.kts").writeText(
-            """
-            rootProject.name = "test-project"
-            include(":app")
-            include(":lib")
-            """.trimIndent()
-        )
-        File(projectDir, ".gitignore").writeText(".gradle/\n.kotlin/\nbuild/")
-
-        val libDir = File(projectDir, "lib")
-        libDir.mkdirs()
-        File(libDir, "build.gradle.kts").writeText(
-            """
-            plugins {
-                kotlin("jvm") version "2.0.21"
-            }
-            """.trimIndent()
-        )
-        File(File(libDir, "src/main/kotlin/com/example").apply { mkdirs() }, "Lib.kt").writeText(
-            """
-            package com.example
-            class Lib { fun greet() = "Hello" }
-            """.trimIndent()
-        )
-
-        val appDir = File(projectDir, "app")
-        appDir.mkdirs()
-        File(appDir, "build.gradle.kts").writeText(
-            """
-            plugins {
-                kotlin("jvm") version "2.0.21"
-            }
-            monorepoProject {
-                release {
-                    enabled = true
-                }
-            }
-            dependencies {
-                implementation(project(":lib"))
-            }
-            """.trimIndent()
-        )
-        File(File(appDir, "src/main/kotlin/com/example").apply { mkdirs() }, "App.kt").writeText(
-            """
-            package com.example
-            class App { fun run() = Lib().greet() }
-            """.trimIndent()
-        )
-
-        val project = ReleaseTestProject(projectDir, remoteDir)
-        project.initGit()
-        project.commitAll("Initial commit")
-        project.pushToRemote()
-
-        // Change only app, not lib
-        File(File(appDir, "src/main/kotlin/com/example"), "App.kt").writeText(
-            """
-            package com.example
-            class App { fun run() = Lib().greet() + "!" }
-            """.trimIndent()
-        )
-        project.commitAll("Change app only")
-
-        project.createBranch("release/app/v0.1.x")
-        project.executeGitPush("release/app/v0.1.x")
-
-        // when
-        val result = project.runTask(":app:release")
-
-        // then: release succeeds, lib was only assembled (not fully built)
-        result.task(":app:release")?.outcome shouldBe TaskOutcome.SUCCESS
-        result.task(":app:buildChanged")?.outcome shouldBe TaskOutcome.SUCCESS
-        result.task(":app:build")?.outcome shouldBe TaskOutcome.SUCCESS
-        result.task(":lib:build") shouldBe null
+        result.task(":core:build") shouldBe null
         project.remoteTags() shouldContain "release/app/v0.1.0"
     }
 })
