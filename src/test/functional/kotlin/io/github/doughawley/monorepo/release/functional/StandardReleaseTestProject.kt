@@ -385,10 +385,6 @@ class ReleaseTestProject(
         file.writeText(content)
     }
 
-    fun useFileProtocol() {
-        setRemoteUrl("origin", "file://${remoteDir.absolutePath}")
-    }
-
     fun runTask(vararg tasks: String, properties: Map<String, String> = emptyMap(), env: Map<String, String> = emptyMap()): BuildResult {
         val args = tasks.toMutableList()
         properties.forEach { (k, v) -> args.add("-P$k=$v") }
