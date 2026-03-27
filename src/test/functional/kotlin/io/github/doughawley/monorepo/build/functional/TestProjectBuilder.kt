@@ -337,3 +337,16 @@ fun BuildResult.extractBuiltProjects(): Set<String> {
             .toSet()
     }
 }
+
+/**
+ * Returns project paths whose :build task actually executed
+ * by inspecting the Gradle BuildResult task list, not log output.
+ * Excludes the root :build task.
+ */
+fun BuildResult.extractExecutedBuildTasks(): Set<String> {
+    return tasks
+        .map { it.path }
+        .filter { it.endsWith(":build") && it != ":build" }
+        .map { it.removeSuffix(":build") }
+        .toSet()
+}
