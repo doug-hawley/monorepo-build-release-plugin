@@ -188,25 +188,6 @@ See [Conventional Commits](https://conventionalcommits.org) for commit guideline
 
 * **deps:** Bump actions/upload-artifact from 4 to 7 ([c6bf3a2](https://github.com/doug-hawley/monorepo-build-release-plugin/commit/c6bf3a211a94a3ab47ec01ca0920cc5dd79420cf))
 
-## [Unreleased]
-
-### Breaking Changes
-
-* **Unified change detection model** — replaced dual branch-mode/ref-mode with a single tag-based model anchored on `monorepo/last-successful-build`. The following DSL properties and tasks have been removed:
-  * Removed `baseBranch` and `commitRef` from `monorepo { build { } }` — replaced by `lastSuccessfulBuildTag` and `primaryBranch`
-  * Removed `releaseBranchPatterns` from `monorepo { release { } }` — the new aggregator task uses a `primaryBranch` guard instead
-  * Removed `-Pmonorepo.commitRef` runtime override
-  * Removed tasks: `printChangedProjectsFromBranch`, `printChangedProjectsFromRef`, `buildChangedProjectsFromBranch`, `buildChangedProjectsFromRef`, `writeChangedProjectsFromRef`, `createReleaseBranch` (per-subproject), `createReleaseBranchesForChangedProjects`
-
-### Features
-
-* add `primaryBranch` property on root `monorepo { }` extension (default: `"main"`)
-* add `lastSuccessfulBuildTag` property for tag-based change detection (default: `"monorepo/last-successful-build"`)
-* add unified `printChangedProjects` and `buildChangedProjects` tasks replacing 6 old tasks
-* add `buildChangedProjectsAndCreateReleaseBranches` aggregator task with branch guard, atomic release branch creation, and automatic tag update
-* add `AtomicReleaseBranchCreator` for two-phase branch creation with rollback on failure
-* add `LastSuccessfulBuildTagUpdater` for automatic tag advancement after successful builds
-
 ## [0.3.3](https://github.com/doug-hawley/monorepo-build-release-plugin/compare/v0.3.2...v0.3.3) (2026-03-04)
 
 
@@ -283,8 +264,6 @@ See [Conventional Commits](https://conventionalcommits.org) for commit guideline
 ### Build System
 
 * prepare release-please for multi-plugin monorepo ([95ae196](https://github.com/doug-hawley/monorepo-gradle-plugins/commit/95ae196b59d8176ac772175ce7a0f1142f945a6b))
-
-## [Unreleased]
 
 ## [0.2.0] - 2026-02-25
 
