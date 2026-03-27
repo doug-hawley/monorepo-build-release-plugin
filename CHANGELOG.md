@@ -4,6 +4,33 @@ All notable changes to this project will be documented in this file.
 
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.4.4](https://github.com/doug-hawley/monorepo-build-release-plugin/compare/v0.4.3...v0.4.4) (2026-03-27)
+
+
+### Features
+
+* add per-subproject buildChanged task (git-aware buildNeeded) ([ad0e96e](https://github.com/doug-hawley/monorepo-build-release-plugin/commit/ad0e96e3066da23ddf381f752355961b925e2e88)), closes [#175](https://github.com/doug-hawley/monorepo-build-release-plugin/issues/175)
+* configurable target branch for PR builds via -Pmonorepo.targetBranch ([4d7a7a7](https://github.com/doug-hawley/monorepo-build-release-plugin/commit/4d7a7a7222f601374f71457bc4289fd756711df3)), closes [#179](https://github.com/doug-hawley/monorepo-build-release-plugin/issues/179)
+* log git commands at info level and output at debug level ([2d81df0](https://github.com/doug-hawley/monorepo-build-release-plugin/commit/2d81df049569621b4b3a506a93bbc065ccb981b6))
+* release task depends on buildChanged instead of build ([83852c4](https://github.com/doug-hawley/monorepo-build-release-plugin/commit/83852c47fe31c58058437e9c0f64c2c25a34a534))
+
+
+### Bug Fixes
+
+* harden git output checks against stderr contamination ([2783e9b](https://github.com/doug-hawley/monorepo-build-release-plugin/commit/2783e9bff95e65f982a23a835694151f19324c8e))
+* propagate git command failures instead of silently swallowing them ([1ad9cd3](https://github.com/doug-hawley/monorepo-build-release-plugin/commit/1ad9cd33beb6a7953ec4381c89bb68757ad32445))
+
+
+### Documentation
+
+* fix stale releaseChanged descriptions and remove obsolete changelog sections ([b7dda9f](https://github.com/doug-hawley/monorepo-build-release-plugin/commit/b7dda9f6e6261ccc1c55661b4f176e504b33818b))
+
+
+### Code Refactoring
+
+* merge upstream dep release tests into single test ([3d017f4](https://github.com/doug-hawley/monorepo-build-release-plugin/commit/3d017f4614ec65fec690731e3988ee14bf0a620c))
+* remove redundant branchExistsOnRemote check from ReleaseBranchCreator ([d53f6b8](https://github.com/doug-hawley/monorepo-build-release-plugin/commit/d53f6b872fb9cc62fae00f59db804a7772fbf18b)), closes [#184](https://github.com/doug-hawley/monorepo-build-release-plugin/issues/184)
+
 ## [0.4.3](https://github.com/doug-hawley/monorepo-build-release-plugin/compare/v0.4.2...v0.4.3) (2026-03-26)
 
 
