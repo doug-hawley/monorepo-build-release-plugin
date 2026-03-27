@@ -43,6 +43,15 @@ class GitReleaseExecutorTest : FunSpec({
         releaseExecutor.isDirty() shouldBe true
     }
 
+    test("isDirty returns false when output contains only non-porcelain lines like stderr trace output") {
+        // given: trace output from GIT_TRACE=1 merged via redirectErrorStream(true)
+        every { executor.execute(rootDir, "status", "--porcelain") } returns
+            CommandResult(success = true, output = listOf("trace: built-in: git status --porcelain"), exitCode = 0)
+
+        // when / then
+        releaseExecutor.isDirty() shouldBe false
+    }
+
     // currentBranch
 
     test("currentBranch returns the branch name from git output") {
@@ -80,6 +89,19 @@ class GitReleaseExecutorTest : FunSpec({
 
         // when / then
         shouldThrow<GradleException> { releaseExecutor.currentBranch() }
+    }
+
+    test("currentBranch returns correct branch when trace output precedes actual output") {
+        // given: trace output from GIT_TRACE=1 appears before the branch name
+        every { executor.execute(rootDir, "rev-parse", "--abbrev-ref", "HEAD") } returns
+            CommandResult(
+                success = true,
+                output = listOf("trace: built-in: git rev-parse --abbrev-ref HEAD", "main"),
+                exitCode = 0
+            )
+
+        // when / then
+        releaseExecutor.currentBranch() shouldBe "main"
     }
 
     // createTagLocally
@@ -242,21 +264,68 @@ class GitReleaseExecutorTest : FunSpec({
         ex.message shouldContain "Atomic push of 2 ref(s) failed"
     }
 
+    // branchExistsLocally
+
+    test("branchExistsLocally returns true when output contains the branch name") {
+        // given
+        every { executor.execute(rootDir, "branch", "--list", "release/app/v0.1.x") } returns
+            CommandResult(success = true, output = listOf("  release/app/v0.1.x"), exitCode = 0)
+
+        // when / then
+        releaseExecutor.branchExistsLocally("release/app/v0.1.x") shouldBe true
+    }
+
+    test("branchExistsLocally returns true when branch is the current branch") {
+        // given: git branch --list shows current branch with asterisk prefix
+        every { executor.execute(rootDir, "branch", "--list", "release/app/v0.1.x") } returns
+            CommandResult(success = true, output = listOf("* release/app/v0.1.x"), exitCode = 0)
+
+        // when / then
+        releaseExecutor.branchExistsLocally("release/app/v0.1.x") shouldBe true
+    }
+
+    test("branchExistsLocally returns false when output is empty") {
+        // given
+        every { executor.execute(rootDir, "branch", "--list", "release/app/v0.1.x") } returns
+            CommandResult(success = true, output = emptyList(), exitCode = 0)
+
+        // when / then
+        releaseExecutor.branchExistsLocally("release/app/v0.1.x") shouldBe false
+    }
+
+    test("branchExistsLocally returns false when output contains only non-branch lines like stderr trace output") {
+        // given: trace output from GIT_TRACE=1 merged via redirectErrorStream(true)
+        every { executor.execute(rootDir, "branch", "--list", "release/app/v0.1.x") } returns
+            CommandResult(success = true, output = listOf("trace: built-in: git branch --list release/app/v0.1.x"), exitCode = 0)
+
+        // when / then
+        releaseExecutor.branchExistsLocally("release/app/v0.1.x") shouldBe false
+    }
+
+    test("branchExistsLocally returns false when command fails") {
+        // given
+        every { executor.execute(rootDir, "branch", "--list", "release/app/v0.1.x") } returns
+            CommandResult(success = false, output = emptyList(), exitCode = 128, errorOutput = "fatal error")
+
+        // when / then
+        releaseExecutor.branchExistsLocally("release/app/v0.1.x") shouldBe false
+    }
+
     // branchExistsOnRemote
 
-    test("branchExistsOnRemote returns true when ls-remote returns output") {
+    test("branchExistsOnRemote returns true when ls-remote exits with code 0") {
         // given
-        every { executor.executeSilently(rootDir, "ls-remote", "--heads", "origin", "release/app/v0.1.x") } returns
+        every { executor.executeSilently(rootDir, "ls-remote", "--exit-code", "--heads", "origin", "release/app/v0.1.x") } returns
             CommandResult(success = true, output = listOf("abc123\trefs/heads/release/app/v0.1.x"), exitCode = 0)
 
         // when / then
         releaseExecutor.branchExistsOnRemote("release/app/v0.1.x") shouldBe true
     }
 
-    test("branchExistsOnRemote returns false when ls-remote returns empty output") {
+    test("branchExistsOnRemote returns false when ls-remote exits with code 2") {
         // given
-        every { executor.executeSilently(rootDir, "ls-remote", "--heads", "origin", "release/app/v0.1.x") } returns
-            CommandResult(success = true, output = emptyList(), exitCode = 0)
+        every { executor.executeSilently(rootDir, "ls-remote", "--exit-code", "--heads", "origin", "release/app/v0.1.x") } returns
+            CommandResult(success = false, output = emptyList(), exitCode = 2, errorOutput = "")
 
         // when / then
         releaseExecutor.branchExistsOnRemote("release/app/v0.1.x") shouldBe false
@@ -264,7 +333,7 @@ class GitReleaseExecutorTest : FunSpec({
 
     test("branchExistsOnRemote returns false when command fails") {
         // given
-        every { executor.executeSilently(rootDir, "ls-remote", "--heads", "origin", "release/app/v0.1.x") } returns
+        every { executor.executeSilently(rootDir, "ls-remote", "--exit-code", "--heads", "origin", "release/app/v0.1.x") } returns
             CommandResult(success = false, output = emptyList(), exitCode = 128, errorOutput = "remote error")
 
         // when / then

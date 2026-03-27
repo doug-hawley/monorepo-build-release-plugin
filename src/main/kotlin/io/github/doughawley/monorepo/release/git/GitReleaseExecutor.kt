@@ -16,7 +16,8 @@ class GitReleaseExecutor(
 
     fun isDirty(): Boolean {
         val result = executor.execute(rootDir, "status", "--porcelain")
-        return result.output.isNotEmpty()
+        val porcelainLine = Regex("[MTADRCU?! ]{2} .+")
+        return result.output.any { porcelainLine.matches(it) }
     }
 
     fun currentBranch(): String {
@@ -24,7 +25,7 @@ class GitReleaseExecutor(
         if (!result.success || result.output.isEmpty()) {
             throw GradleException("Failed to determine current git branch: ${result.errorOutput}")
         }
-        return result.output.first().trim()
+        return result.output.last().trim()
     }
 
     fun createTagLocally(tag: String) {
@@ -101,11 +102,11 @@ class GitReleaseExecutor(
 
     fun branchExistsLocally(branch: String): Boolean {
         val result = executor.execute(rootDir, "branch", "--list", branch)
-        return result.success && result.output.isNotEmpty()
+        return result.success && result.output.any { it.trim().removePrefix("* ") == branch }
     }
 
     fun branchExistsOnRemote(branch: String): Boolean {
-        val result = executor.executeSilently(rootDir, "ls-remote", "--heads", "origin", branch)
-        return result.success && result.output.isNotEmpty()
+        val result = executor.executeSilently(rootDir, "ls-remote", "--exit-code", "--heads", "origin", branch)
+        return result.success
     }
 }

@@ -385,23 +385,28 @@ class ReleaseTestProject(
         file.writeText(content)
     }
 
-    fun runTask(vararg tasks: String, properties: Map<String, String> = emptyMap()): BuildResult {
+    fun useFileProtocol() {
+        setRemoteUrl("origin", "file://${remoteDir.absolutePath}")
+    }
+
+    fun runTask(vararg tasks: String, properties: Map<String, String> = emptyMap(), env: Map<String, String> = emptyMap()): BuildResult {
         val args = tasks.toMutableList()
         properties.forEach { (k, v) -> args.add("-P$k=$v") }
         args.addAll(listOf("--stacktrace"))
-        return gradleRunner().withArguments(args).build()
+        return gradleRunner(env).withArguments(args).build()
     }
 
-    fun runTaskAndFail(vararg tasks: String, properties: Map<String, String> = emptyMap()): BuildResult {
+    fun runTaskAndFail(vararg tasks: String, properties: Map<String, String> = emptyMap(), env: Map<String, String> = emptyMap()): BuildResult {
         val args = tasks.toMutableList()
         properties.forEach { (k, v) -> args.add("-P$k=$v") }
         args.addAll(listOf("--stacktrace"))
-        return gradleRunner().withArguments(args).buildAndFail()
+        return gradleRunner(env).withArguments(args).buildAndFail()
     }
 
-    private fun gradleRunner(): GradleRunner {
+    private fun gradleRunner(extraEnv: Map<String, String> = emptyMap()): GradleRunner {
         val env = HashMap(System.getenv())
         env.keys.removeIf { it.startsWith("DEVELOCITY_") || it.startsWith("GRADLE_BUILD_ACTION_") }
+        env.putAll(extraEnv)
         return GradleRunner.create()
             .withProjectDir(projectDir)
             .withEnvironment(env)

@@ -5,6 +5,7 @@ import io.kotest.matchers.collections.shouldContain
 import io.kotest.matchers.collections.shouldNotContain
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
+import io.kotest.matchers.string.shouldNotContain
 import org.gradle.testkit.runner.TaskOutcome
 
 class ReleaseChangedFunctionalTest : FunSpec({
@@ -453,6 +454,53 @@ class ReleaseChangedFunctionalTest : FunSpec({
         result.task(":app:release")?.outcome shouldBe TaskOutcome.SUCCESS
         project.remoteTags() shouldContain "release/app/v0.1.0"
         project.releaseVersionFile() shouldBe "0.1.0"
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    // Stderr contamination during ls-remote (regression)
+    // ─────────────────────────────────────────────────────────────
+
+    test("creates release branch when git produces stderr output during ls-remote") {
+        // given: use file:// protocol to force pack protocol negotiation, plus
+        // GIT_TRACE_PACKET to produce stderr output. This reproduces the CI bug
+        // where credential-helper or TLS messages on stderr were merged into stdout
+        // by redirectErrorStream(true), causing branchExistsOnRemote to return a
+        // false positive (exit code 0 + non-empty output = "branch exists").
+        val project = StandardReleaseTestProject.createMultiProjectAndInitialize(testListener.getTestProjectDir())
+        project.useFileProtocol()
+        project.createTag("monorepo/last-successful-build")
+        project.pushTag("monorepo/last-successful-build")
+        project.modifyFile("app/app.txt", "changed")
+        project.commitAll("Change app")
+
+        // when: GIT_TRACE_PACKET produces stderr during ls-remote, simulating CI stderr contamination
+        val result = project.runTask("releaseChanged", env = mapOf("GIT_TRACE_PACKET" to "1"))
+
+        // then: branch is created — not incorrectly skipped as "already exists"
+        result.task(":releaseChanged")?.outcome shouldBe TaskOutcome.SUCCESS
+        project.remoteBranches() shouldContain "release/app/v0.1.x"
+        result.output shouldNotContain "already exists on remote"
+    }
+
+    test("creates release branch when GIT_TRACE contaminates stderr on all git commands") {
+        // given: GIT_TRACE=1 produces trace output on stderr for every git command.
+        // With redirectErrorStream(true), trace lines are merged into stdout.
+        // This verifies currentBranch, branchExistsLocally, and branchExistsOnRemote
+        // all handle trace contamination correctly.
+        val project = StandardReleaseTestProject.createMultiProjectAndInitialize(testListener.getTestProjectDir())
+        project.createTag("monorepo/last-successful-build")
+        project.pushTag("monorepo/last-successful-build")
+        project.modifyFile("app/app.txt", "changed")
+        project.commitAll("Change app")
+
+        // when
+        val result = project.runTask("releaseChanged", env = mapOf("GIT_TRACE" to "1"))
+
+        // then: all checks pass despite trace contamination
+        result.task(":releaseChanged")?.outcome shouldBe TaskOutcome.SUCCESS
+        project.remoteBranches() shouldContain "release/app/v0.1.x"
+        result.output shouldNotContain "already exists on remote"
+        result.output shouldNotContain "already exists locally"
     }
 
     // ─────────────────────────────────────────────────────────────
