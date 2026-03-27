@@ -46,6 +46,14 @@ The plugin detects changes by comparing HEAD against a baseline ref. The baselin
 - **CI release builds** (`releaseChanged`): uses the `lastSuccessfulBuildTag`. If the tag doesn't exist (e.g., first run), all projects are treated as changed.
 - **Dev and PR builds** (all other tasks): uses `origin/{primaryBranch}`. If the remote branch isn't available, all projects are treated as changed.
 
+For PRs targeting a branch other than `primaryBranch` (e.g., a release branch), pass the target branch via `-Pmonorepo.targetBranch`:
+
+```bash
+./gradlew buildChanged -Pmonorepo.targetBranch=release/app/v0.1.x
+```
+
+The plugin will use `origin/{targetBranch}` as the baseline instead of `origin/{primaryBranch}`, fetching the branch from origin if needed. This only affects build tasks (`buildChanged`, `printChanged`, per-project `buildChanged`); `releaseChanged` continues to use the last-successful-build tag.
+
 Individual subprojects can declare their own exclude patterns using the `monorepoProject` extension. Patterns are matched against paths relative to the subproject directory and are applied after global `excludePatterns`.
 
 ```kotlin
@@ -399,6 +407,14 @@ Applied per subproject to opt in to release management.
 |----------|------|---------|-------------|
 | `enabled` | Boolean | `false` | Whether this subproject participates in releases |
 | `tagPrefix` | String? | `null` | Override the auto-derived tag prefix (default derives from Gradle path: `:api:core` → `api-core`) |
+
+### Gradle Properties
+
+Command-line properties passed via `-P`:
+
+| Property | Applies To | Description |
+|----------|-----------|-------------|
+| `monorepo.targetBranch` | `buildChanged`, `printChanged`, per-project `buildChanged` | Overrides the default `origin/{primaryBranch}` baseline with `origin/{value}`. Accepts both `release/v1.x` and `origin/release/v1.x`. The branch is fetched from origin if not available locally. If the ref doesn't exist, all projects are treated as changed. Has no effect on `releaseChanged`. |
 
 ## Troubleshooting
 

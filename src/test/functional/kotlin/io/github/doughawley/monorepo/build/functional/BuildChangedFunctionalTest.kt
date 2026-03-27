@@ -365,4 +365,159 @@ class BuildChangedFunctionalTest : FunSpec({
         val built = result.extractBuiltProjects()
         built shouldContain Projects.APP2
     }
+
+    // ─────────────────────────────────────────────────────────────
+    // monorepo.targetBranch property scenarios
+    // ─────────────────────────────────────────────────────────────
+
+    test("buildChanged uses monorepo.targetBranch as baseline when set") {
+        // given
+        val project = StandardTestProject.createAndInitialize(
+            testProjectListener.getTestProjectDir(),
+            withRemote = true
+        )
+
+        // Create a release branch at the current commit
+        project.executeGitCommand("branch", "release/v1.0.x")
+        project.executeGitCommand("push", "origin", "release/v1.0.x")
+
+        // Make changes on main after the branch point
+        project.appendToFile(Files.COMMON_LIB_SOURCE, "\n// Change on main")
+        project.commitAll("Change common-lib on main")
+
+        project.appendToFile(Files.MODULE1_SOURCE, "\n// Feature change")
+        project.commitAll("Change module1")
+
+        // when: compare against the release branch, not origin/main
+        val result = project.runTaskWithProperties(
+            "buildChanged",
+            properties = mapOf("monorepo.targetBranch" to "release/v1.0.x")
+        )
+
+        // then: both changes since the branch point are detected
+        result.task(":buildChanged")?.outcome shouldBe TaskOutcome.SUCCESS
+        result.output shouldContain "Change detection baseline: origin/release/v1.0.x"
+        val built = result.extractBuiltProjects()
+        built shouldContainAll setOf(
+            Projects.COMMON_LIB,
+            Projects.MODULE1,
+            Projects.MODULE2,
+            Projects.APP1,
+            Projects.APP2
+        )
+    }
+
+    test("buildChanged with monorepo.targetBranch overrides origin/main") {
+        // given
+        val project = StandardTestProject.createAndInitialize(
+            testProjectListener.getTestProjectDir(),
+            withRemote = true
+        )
+
+        project.appendToFile(Files.APP2_SOURCE, "\n// Modified")
+        project.commitAll("Change app2")
+
+        // when: explicitly pass main — same as default but exercises the property path
+        val result = project.runTaskWithProperties(
+            "buildChanged",
+            properties = mapOf("monorepo.targetBranch" to "main")
+        )
+
+        // then: same behaviour as without the property
+        result.task(":buildChanged")?.outcome shouldBe TaskOutcome.SUCCESS
+        result.output shouldContain "Change detection baseline: origin/main"
+        val built = result.extractBuiltProjects()
+        built shouldContain Projects.APP2
+        built shouldNotContain Projects.COMMON_LIB
+    }
+
+    test("buildChanged fetches target branch when not available locally") {
+        // given
+        val project = StandardTestProject.createAndInitialize(
+            testProjectListener.getTestProjectDir(),
+            withRemote = true
+        )
+
+        // Create and push a release branch
+        project.executeGitCommand("branch", "release/v1.0.x")
+        project.executeGitCommand("push", "origin", "release/v1.0.x")
+
+        // Delete the local remote-tracking ref to simulate CI
+        project.executeGitCommand("update-ref", "-d", "refs/remotes/origin/release/v1.0.x")
+
+        project.appendToFile(Files.MODULE2_SOURCE, "\n// Feature change")
+        project.commitAll("Change module2")
+
+        // when
+        val result = project.runTaskWithProperties(
+            "buildChanged",
+            properties = mapOf("monorepo.targetBranch" to "release/v1.0.x")
+        )
+
+        // then: plugin fetches the branch and resolves successfully
+        result.task(":buildChanged")?.outcome shouldBe TaskOutcome.SUCCESS
+        result.output shouldContain "Change detection baseline: origin/release/v1.0.x"
+        val built = result.extractBuiltProjects()
+        built shouldContain Projects.MODULE2
+        built shouldContain Projects.APP2
+    }
+
+    test("buildChanged treats all as changed when target branch does not exist") {
+        // given
+        val project = StandardTestProject.createAndInitialize(
+            testProjectListener.getTestProjectDir(),
+            withRemote = true
+        )
+
+        // when
+        val result = project.runTaskWithProperties(
+            "buildChanged",
+            properties = mapOf("monorepo.targetBranch" to "nonexistent-branch")
+        )
+
+        // then
+        result.task(":buildChanged")?.outcome shouldBe TaskOutcome.SUCCESS
+        result.output shouldContain "from -Pmonorepo.targetBranch"
+        result.output shouldContain "not available"
+        result.output shouldContain "Change detection baseline: none"
+        val built = result.extractBuiltProjects()
+        built shouldContainAll setOf(
+            Projects.COMMON_LIB,
+            Projects.MODULE1,
+            Projects.MODULE2,
+            Projects.APP1,
+            Projects.APP2
+        )
+    }
+
+    test("buildChanged with monorepo.targetBranch detects changes relative to release branch") {
+        // given
+        val project = StandardTestProject.createAndInitialize(
+            testProjectListener.getTestProjectDir(),
+            withRemote = true
+        )
+
+        // Push initial state, then create release branch
+        project.executeGitCommand("branch", "release/v1.0.x")
+        project.executeGitCommand("push", "origin", "release/v1.0.x")
+
+        // Switch to a feature branch and change only module1
+        project.executeGitCommand("checkout", "-b", "feature/add-widget")
+        project.appendToFile(Files.MODULE1_SOURCE, "\n// Widget feature")
+        project.commitAll("Add widget to module1")
+
+        // when: compare against the release branch
+        val result = project.runTaskWithProperties(
+            "buildChanged",
+            properties = mapOf("monorepo.targetBranch" to "release/v1.0.x")
+        )
+
+        // then: only module1 and its dependents are affected
+        result.task(":buildChanged")?.outcome shouldBe TaskOutcome.SUCCESS
+        val built = result.extractBuiltProjects()
+        built shouldContainAll setOf(Projects.MODULE1, Projects.APP1)
+        built shouldNotContain Projects.COMMON_LIB
+        built shouldNotContain Projects.MODULE2
+        built shouldNotContain Projects.APP2
+    }
 })
