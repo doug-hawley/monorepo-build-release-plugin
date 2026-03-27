@@ -541,7 +541,7 @@ class ReleaseTaskFunctionalTest : FunSpec({
     // Push and rollback
     // ─────────────────────────────────────────────────────────────
 
-    test("push fails when no remote configured — local tag is deleted, task fails cleanly") {
+    test("release fails early when no remote configured — no local tag created") {
         // given: project without remote
         val projectDir = testListener.getTestProjectDir()
         File(projectDir, "build.gradle.kts").writeText(
@@ -596,8 +596,8 @@ class ReleaseTaskFunctionalTest : FunSpec({
         // when
         val result = project.runTaskAndFail(":app:release")
 
-        // then: push failed, local tag rolled back
-        result.output shouldContain "Push failed, rolling back local changes"
+        // then: fails at ls-remote before any local state is created
+        result.output shouldContain "Git command failed"
         project.localTags() shouldNotContain "release/app/v0.1.0"
     }
 

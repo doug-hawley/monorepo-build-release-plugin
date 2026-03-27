@@ -16,6 +16,9 @@ class GitReleaseExecutor(
 
     fun isDirty(): Boolean {
         val result = executor.execute(rootDir, "status", "--porcelain")
+        if (!result.success) {
+            throw GradleException("Failed to check working tree status: ${result.errorOutput}")
+        }
         val porcelainLine = Regex("[MTADRCU?! ]{2} .+")
         return result.output.any { porcelainLine.matches(it) }
     }
@@ -102,7 +105,10 @@ class GitReleaseExecutor(
 
     fun branchExistsLocally(branch: String): Boolean {
         val result = executor.execute(rootDir, "branch", "--list", branch)
-        return result.success && result.output.any { it.trim().removePrefix("* ") == branch }
+        if (!result.success) {
+            throw GradleException("Failed to list local branches: ${result.errorOutput}")
+        }
+        return result.output.any { it.trim().removePrefix("* ") == branch }
     }
 
     fun branchExistsOnRemote(branch: String): Boolean {

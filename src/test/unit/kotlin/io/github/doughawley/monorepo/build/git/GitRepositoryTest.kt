@@ -218,6 +218,48 @@ class GitRepositoryTest : FunSpec({
         }
     }
 
+    // --- git command failure propagation ---
+
+    test("workingTreeChanges throws when git state is corrupted") {
+        // given: corrupt HEAD so git commands fail
+        File(repoDir, ".git/HEAD").writeText("garbage")
+
+        // when / then
+        shouldThrow<RuntimeException> {
+            GitRepository(repoDir, logger).workingTreeChanges()
+        }
+    }
+
+    test("stagedFiles throws when git state is corrupted") {
+        // given
+        File(repoDir, ".git/HEAD").writeText("garbage")
+
+        // when / then
+        shouldThrow<RuntimeException> {
+            GitRepository(repoDir, logger).stagedFiles()
+        }
+    }
+
+    test("untrackedFiles throws when git state is corrupted") {
+        // given
+        File(repoDir, ".git/HEAD").writeText("garbage")
+
+        // when / then
+        shouldThrow<RuntimeException> {
+            GitRepository(repoDir, logger).untrackedFiles()
+        }
+    }
+
+    test("allTrackedFiles throws when git state is corrupted") {
+        // given
+        File(repoDir, ".git/HEAD").writeText("garbage")
+
+        // when / then
+        shouldThrow<RuntimeException> {
+            GitRepository(repoDir, logger).allTrackedFiles()
+        }
+    }
+
     // --- fetchTag ---
 
     test("fetchTag returns true and restores local tag when tag exists on remote") {

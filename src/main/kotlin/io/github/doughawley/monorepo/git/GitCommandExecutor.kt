@@ -50,16 +50,24 @@ class GitCommandExecutor(private val logger: Logger) {
     }
 
     /**
-     * Executes a git command and returns only the output lines if successful, empty list otherwise.
-     * This is a convenience method for cases where you only care about the output on success.
+     * Executes a git command and returns the output lines on success.
+     * Throws [RuntimeException] if the command fails, since callers of this method
+     * do not expect failure — use [executeSilently] for commands where non-zero exit
+     * codes are expected.
      *
      * @param directory The directory to execute the command in
      * @param command The git command and arguments
-     * @return List of output lines if successful, empty list otherwise
+     * @return List of output lines on success
+     * @throws RuntimeException if the command exits with a non-zero code
      */
     fun executeForOutput(directory: File, vararg command: String): List<String> {
         val result = execute(directory, *command)
-        return if (result.success) result.output else emptyList()
+        if (!result.success) {
+            throw RuntimeException(
+                "Git command failed (exit code ${result.exitCode}): git ${command.joinToString(" ")}\n${result.errorOutput}"
+            )
+        }
+        return result.output
     }
 
     private fun runCommand(directory: File, silent: Boolean, vararg command: String): CommandResult {

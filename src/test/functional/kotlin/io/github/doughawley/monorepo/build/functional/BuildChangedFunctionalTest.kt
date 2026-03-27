@@ -520,4 +520,28 @@ class BuildChangedFunctionalTest : FunSpec({
         built shouldNotContain Projects.MODULE2
         built shouldNotContain Projects.APP2
     }
+
+    // ─────────────────────────────────────────────────────────────
+    // Git command failure propagation
+    // ─────────────────────────────────────────────────────────────
+
+    test("buildChanged fails when git state is corrupted") {
+        // given
+        val project = StandardTestProject.createAndInitialize(
+            testProjectListener.getTestProjectDir(),
+            withRemote = true
+        )
+
+        project.appendToFile(Files.APP2_SOURCE, "\n// Modified")
+        project.commitAll("Change app2")
+
+        // Corrupt HEAD so all git commands fail
+        java.io.File(project.projectDir, ".git/HEAD").writeText("garbage")
+
+        // when
+        val result = project.runTaskAndFail("buildChanged")
+
+        // then
+        result.output shouldContain "Failed to compute changed project metadata"
+    }
 })

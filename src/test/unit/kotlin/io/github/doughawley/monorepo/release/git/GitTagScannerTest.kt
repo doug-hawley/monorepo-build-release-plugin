@@ -1,10 +1,13 @@
 package io.github.doughawley.monorepo.release.git
 
 import io.github.doughawley.monorepo.git.GitCommandExecutor
+import io.github.doughawley.monorepo.git.GitCommandExecutor.CommandResult
 import io.github.doughawley.monorepo.release.domain.SemanticVersion
+import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.nulls.shouldBeNull
 import io.kotest.matchers.shouldBe
+import io.kotest.matchers.string.shouldContain
 import io.mockk.clearAllMocks
 import io.mockk.every
 import io.mockk.mockk
@@ -231,5 +234,49 @@ class GitTagScannerTest : FunSpec({
 
         // then
         result shouldBe false
+    }
+
+    // --- git command failure propagation ---
+
+    test("findLatestVersion throws when git ls-remote fails") {
+        // given
+        every {
+            executor.executeForOutput(rootDir, "ls-remote", "--tags", "--refs", "origin", "refs/tags/release/app/v*")
+        } throws RuntimeException("Git command failed (exit code 128): git ls-remote --tags --refs origin refs/tags/release/app/v*\nfatal: could not read from remote repository")
+
+        // when / then
+        val ex = shouldThrow<RuntimeException> { scanner.findLatestVersion("release", "app") }
+        ex.message shouldContain "Git command failed"
+    }
+
+    test("findLatestVersionInLine throws when git ls-remote fails") {
+        // given
+        every {
+            executor.executeForOutput(rootDir, "ls-remote", "--tags", "--refs", "origin", "refs/tags/release/app/v1.2.*")
+        } throws RuntimeException("Git command failed (exit code 128): fatal: could not read from remote repository")
+
+        // when / then
+        shouldThrow<RuntimeException> { scanner.findLatestVersionInLine("release", "app", 1, 2) }
+    }
+
+    test("findLatestBranchVersion throws when git ls-remote fails") {
+        // given
+        every {
+            executor.executeForOutput(rootDir, "ls-remote", "--heads", "origin", "refs/heads/release/app/v*")
+        } throws RuntimeException("Git command failed (exit code 128): fatal: could not read from remote repository")
+
+        // when / then
+        shouldThrow<RuntimeException> { scanner.findLatestBranchVersion("release", "app") }
+    }
+
+    test("tagExists throws when git tag command fails") {
+        // given
+        every {
+            executor.executeForOutput(rootDir, "tag", "-l", "release/app/v1.0.0")
+        } throws RuntimeException("Git command failed (exit code 128): fatal: not a git repository")
+
+        // when / then
+        val ex = shouldThrow<RuntimeException> { scanner.tagExists("release/app/v1.0.0") }
+        ex.message shouldContain "Git command failed"
     }
 })
