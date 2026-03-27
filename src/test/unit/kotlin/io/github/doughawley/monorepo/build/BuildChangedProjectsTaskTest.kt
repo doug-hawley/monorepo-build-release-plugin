@@ -21,6 +21,25 @@ class BuildChangedProjectsTaskTest : FunSpec({
         task?.description shouldBe "Builds only the projects that have been affected by changes"
     }
 
+    test("buildChanged task should be registered on subprojects") {
+        // given
+        val rootProject = ProjectBuilder.builder().build()
+        ProjectBuilder.builder()
+            .withName("sub")
+            .withParent(rootProject)
+            .build()
+
+        // when
+        rootProject.pluginManager.apply("io.github.doug-hawley.monorepo-build-release-plugin")
+
+        // then
+        val subproject = rootProject.findProject(":sub")!!
+        val task = subproject.tasks.findByName("buildChanged")
+        task shouldNotBe null
+        task?.group shouldBe "monorepo"
+        task?.description shouldBe "Builds this project and runs build on any changed upstream dependencies"
+    }
+
     test("releaseChanged task should be registered") {
         // given
         val project = ProjectBuilder.builder().build()

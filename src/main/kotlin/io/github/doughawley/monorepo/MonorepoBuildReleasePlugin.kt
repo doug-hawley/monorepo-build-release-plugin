@@ -66,6 +66,16 @@ class MonorepoBuildReleasePlugin : Plugin<Project> {
             registerReleaseTasks(sub, rootReleaseExtension, projectExtension.release)
         }
 
+        // Register per-subproject buildChanged tasks eagerly.
+        // The build and upstream dependency wiring happens later in projectsEvaluated
+        // because grouping projects (e.g. :apps, :modules) may not have a build task.
+        project.subprojects.forEach { sub ->
+            sub.tasks.register("buildChanged").configure {
+                group = TASK_GROUP
+                description = "Builds this project and runs build on any changed upstream dependencies"
+            }
+        }
+
         // Compute metadata in configuration phase after ALL projects are evaluated.
         // Under --parallel, multiple threads may fire this callback concurrently.
         // computationGuard.compareAndSet(false, true) ensures only the first thread proceeds.
@@ -102,6 +112,7 @@ class MonorepoBuildReleasePlugin : Plugin<Project> {
                     }
 
                     wireDependsOn(project, "buildChanged", rootBuildExtension.allAffectedProjects)
+                    wirePerProjectBuildChanged(project, rootBuildExtension)
                     rootBuildExtension.metadataComputed = true
                     project.logger.debug("Changed project metadata computed successfully in configuration phase")
                 } catch (e: GradleException) {
@@ -288,12 +299,12 @@ class MonorepoBuildReleasePlugin : Plugin<Project> {
      * whose output benefits from a visible baseline log message.
      */
     private fun isChangeDetectionRun(project: Project): Boolean {
-        val changeDetectionTasks = setOf(
-            "printChanged", ":printChanged",
-            "buildChanged", ":buildChanged",
-            "releaseChanged", ":releaseChanged"
-        )
-        return project.gradle.startParameter.taskNames.any { it in changeDetectionTasks }
+        return project.gradle.startParameter.taskNames.any { taskName ->
+            taskName == "printChanged" || taskName == ":printChanged" ||
+            taskName == "buildChanged" || taskName == ":buildChanged" ||
+            taskName.endsWith(":buildChanged") ||
+            taskName == "releaseChanged" || taskName == ":releaseChanged"
+        }
     }
 
     /**
@@ -314,6 +325,39 @@ class MonorepoBuildReleasePlugin : Plugin<Project> {
                 }
             } else {
                 project.logger.warn("Project not found: $projectPath")
+            }
+        }
+    }
+
+    /**
+     * Wires each subproject's buildChanged task to depend on the build task
+     * of any changed transitive upstream dependency.
+     */
+    private fun wirePerProjectBuildChanged(project: Project, buildExtension: MonorepoBuildExtension) {
+        val affectedProjects = buildExtension.allAffectedProjects
+        val monorepoProjects = buildExtension.monorepoProjects
+
+        project.subprojects.forEach { sub ->
+            val buildChangedTask = sub.tasks.findByName("buildChanged") ?: return@forEach
+
+            // Wire the project's own build task (skipped for grouping projects without build)
+            val ownBuildTask = sub.tasks.findByName("build")
+            if (ownBuildTask != null) {
+                buildChangedTask.dependsOn(ownBuildTask)
+            }
+
+            val metadata = monorepoProjects.findProjectByName(sub.path) ?: return@forEach
+            val transitiveDeps = metadata.getTransitiveDependencies()
+            val changedUpstreamDeps = transitiveDeps.intersect(affectedProjects)
+
+            changedUpstreamDeps.forEach { depPath ->
+                val depProject = project.rootProject.findProject(depPath)
+                if (depProject != null) {
+                    val buildTask = depProject.tasks.findByName("build")
+                    if (buildTask != null) {
+                        buildChangedTask.dependsOn(buildTask)
+                    }
+                }
             }
         }
     }
