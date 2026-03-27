@@ -273,6 +273,32 @@ class MonorepoBuildReleasePlugin : Plugin<Project> {
             return null
         }
 
+        val targetBranch = project.findProperty("monorepo.targetBranch") as? String
+        if (targetBranch != null) {
+            val remoteRef = if (targetBranch.startsWith("origin/")) targetBranch else "origin/$targetBranch"
+            if (!gitRepository.refExists(remoteRef)) {
+                val branchName = if (targetBranch.startsWith("origin/")) {
+                    targetBranch.removePrefix("origin/")
+                } else {
+                    targetBranch
+                }
+                try {
+                    gitRepository.fetchBranch("origin", branchName)
+                } catch (e: Exception) {
+                    project.logger.debug("Could not fetch '$branchName' from origin: ${e.message}")
+                }
+            }
+            if (gitRepository.refExists(remoteRef)) {
+                project.logger.debug("Using target branch '$remoteRef' as base ref (from -Pmonorepo.targetBranch)")
+                return remoteRef
+            }
+            project.logger.lifecycle(
+                "'$remoteRef' (from -Pmonorepo.targetBranch) is not available — no baseline exists. " +
+                "All projects will be treated as changed."
+            )
+            return null
+        }
+
         if (!gitRepository.refExists(remoteBranch)) {
             // Many CI environments (e.g. Vela) only fetch the ref being built,
             // so the remote-tracking branch may not exist locally. Fetch it.
