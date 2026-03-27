@@ -4,6 +4,13 @@ All notable changes to this project will be documented in this file.
 
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.4.5](https://github.com/doug-hawley/monorepo-build-release-plugin/compare/v0.4.4...v0.4.5) (2026-03-27)
+
+
+### Bug Fixes
+
+* prevent buildChanged from building all projects when none have changed ([b1e6f2d](https://github.com/doug-hawley/monorepo-build-release-plugin/commit/b1e6f2df84891bf44a28f941726994be2d5632cd))
+
 ## [0.4.4](https://github.com/doug-hawley/monorepo-build-release-plugin/compare/v0.4.3...v0.4.4) (2026-03-27)
 
 
