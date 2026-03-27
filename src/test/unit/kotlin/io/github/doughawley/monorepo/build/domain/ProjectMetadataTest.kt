@@ -1,6 +1,7 @@
 package io.github.doughawley.monorepo.build.domain
 
 import io.kotest.core.spec.style.FunSpec
+import io.kotest.matchers.collections.shouldContainExactlyInAnyOrder
 import io.kotest.matchers.shouldBe
 
 class ProjectMetadataTest : FunSpec({
@@ -184,6 +185,91 @@ class ProjectMetadataTest : FunSpec({
 
         // then
         root.hasChanges() shouldBe false
+    }
+
+    test("getTransitiveDependencies returns empty set for project with no dependencies") {
+        // given
+        val metadata = ProjectMetadata(
+            name = "standalone",
+            fullyQualifiedName = ":standalone"
+        )
+
+        // then
+        metadata.getTransitiveDependencies() shouldBe emptySet()
+    }
+
+    test("getTransitiveDependencies returns direct dependencies") {
+        // given
+        val depB = ProjectMetadata(name = "b", fullyQualifiedName = ":b")
+        val depC = ProjectMetadata(name = "c", fullyQualifiedName = ":c")
+        val root = ProjectMetadata(
+            name = "a",
+            fullyQualifiedName = ":a",
+            dependencies = listOf(depB, depC)
+        )
+
+        // then
+        root.getTransitiveDependencies() shouldContainExactlyInAnyOrder listOf(":b", ":c")
+    }
+
+    test("getTransitiveDependencies returns full transitive chain") {
+        // given: A → B → C → D
+        val depD = ProjectMetadata(name = "d", fullyQualifiedName = ":d")
+        val depC = ProjectMetadata(name = "c", fullyQualifiedName = ":c", dependencies = listOf(depD))
+        val depB = ProjectMetadata(name = "b", fullyQualifiedName = ":b", dependencies = listOf(depC))
+        val root = ProjectMetadata(name = "a", fullyQualifiedName = ":a", dependencies = listOf(depB))
+
+        // then
+        root.getTransitiveDependencies() shouldContainExactlyInAnyOrder listOf(":b", ":c", ":d")
+    }
+
+    test("getTransitiveDependencies handles diamond dependency graph") {
+        // given: A → B, C; B → D; C → D
+        val sharedDep = ProjectMetadata(name = "d", fullyQualifiedName = ":d")
+        val depB = ProjectMetadata(name = "b", fullyQualifiedName = ":b", dependencies = listOf(sharedDep))
+        val depC = ProjectMetadata(name = "c", fullyQualifiedName = ":c", dependencies = listOf(sharedDep))
+        val root = ProjectMetadata(
+            name = "a",
+            fullyQualifiedName = ":a",
+            dependencies = listOf(depB, depC)
+        )
+
+        // then — D appears once despite two paths
+        root.getTransitiveDependencies() shouldContainExactlyInAnyOrder listOf(":b", ":c", ":d")
+    }
+
+    test("getTransitiveDependencies does not include self") {
+        // given
+        val dep = ProjectMetadata(name = "dep", fullyQualifiedName = ":dep")
+        val root = ProjectMetadata(
+            name = "root",
+            fullyQualifiedName = ":root",
+            dependencies = listOf(dep)
+        )
+
+        // then
+        val result = root.getTransitiveDependencies()
+        result shouldContainExactlyInAnyOrder listOf(":dep")
+    }
+
+    test("getTransitiveDependencies handles deep chain") {
+        // given: chain of 20 projects
+        fun buildChain(depth: Int): ProjectMetadata {
+            if (depth == 0) {
+                return ProjectMetadata(name = "leaf", fullyQualifiedName = ":leaf")
+            }
+            return ProjectMetadata(
+                name = "level-$depth",
+                fullyQualifiedName = ":level-$depth",
+                dependencies = listOf(buildChain(depth - 1))
+            )
+        }
+
+        val root = buildChain(20)
+
+        // then
+        val result = root.getTransitiveDependencies()
+        result.size shouldBe 20
     }
 
     test("toString includes dependency count and file count") {
