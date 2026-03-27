@@ -111,8 +111,4 @@ class GitReleaseExecutor(
         return result.output.any { it.trim().removePrefix("* ") == branch }
     }
 
-    fun branchExistsOnRemote(branch: String): Boolean {
-        val result = executor.executeSilently(rootDir, "ls-remote", "--exit-code", "--heads", "origin", branch)
-        return result.success
-    }
 }

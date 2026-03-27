@@ -50,31 +50,12 @@ class ReleaseBranchCreator(
 
         val allResolved = resolveReleases(projects, globalPrefix, scope)
 
-        // Skip projects whose release branch already exists on remote.
-        // This covers the case where a prior run's atomic push succeeded
-        // but the lastSuccessfulBuildTag update failed afterward.
-        val filtered = allResolved.filterNot { (projectPath, resolved) ->
-            val exists = gitReleaseExecutor.branchExistsOnRemote(resolved.branch)
-            if (exists) {
-                logger.warn(
-                    "Skipping $projectPath: release branch '${resolved.branch}' already exists on remote. " +
-                    "This usually means a prior releaseChanged run already released this version."
-                )
-            }
-            exists
-        }
-
-        if (filtered.isEmpty()) {
-            logger.warn("All releases already exist on remote — nothing to create")
-            return ReleaseResult(emptyList(), emptyMap(), emptyMap())
-        }
-
-        val branches = filtered.values.map { it.branch }
+        val branches = allResolved.values.map { it.branch }
 
         // Phase 1: Create all branches locally
         val createdBranches = mutableListOf<String>()
         try {
-            for (resolved in filtered.values) {
+            for (resolved in allResolved.values) {
                 if (gitReleaseExecutor.branchExistsLocally(resolved.branch)) {
                     throw GradleException(
                         "Release branch '${resolved.branch}' already exists locally. " +
@@ -99,14 +80,14 @@ class ReleaseBranchCreator(
             throw GradleException("Atomic push of release branches failed: ${e.message}", e)
         }
 
-        filtered.forEach { (projectPath, resolved) ->
+        allResolved.forEach { (projectPath, resolved) ->
             logger.lifecycle("Created release branch for $projectPath: ${resolved.branch} (version line ${resolved.version.major}.${resolved.version.minor}.x)")
         }
 
         return ReleaseResult(
             createdBranches = branches,
-            projectToVersion = filtered.mapValues { it.value.version },
-            projectToBranch = filtered.mapValues { it.value.branch }
+            projectToVersion = allResolved.mapValues { it.value.version },
+            projectToBranch = allResolved.mapValues { it.value.branch }
         )
     }
 
