@@ -516,6 +516,28 @@ class ReleaseTaskFunctionalTest : FunSpec({
     }
 
     // ─────────────────────────────────────────────────────────────
+    // Stderr contamination (regression)
+    // ─────────────────────────────────────────────────────────────
+
+    test("release succeeds when GIT_TRACE contaminates stderr on all git commands") {
+        // given: GIT_TRACE=1 produces trace output on stderr for every git command.
+        // With redirectErrorStream(true), trace lines are merged into stdout.
+        // This verifies isDirty, currentBranch, and tagExists all handle trace
+        // contamination without false positives.
+        val project = StandardReleaseTestProject.createAndInitialize(testListener.getTestProjectDir())
+        project.createBranch("release/app/v0.1.x")
+        project.executeGitPush("release/app/v0.1.x")
+        project.createFakeBuiltArtifact()
+
+        // when
+        val result = project.runTask(":app:release", env = mapOf("GIT_TRACE" to "1"))
+
+        // then: all guardrails pass despite trace contamination
+        result.task(":app:release")?.outcome shouldBe TaskOutcome.SUCCESS
+        project.remoteTags() shouldContain "release/app/v0.1.0"
+    }
+
+    // ─────────────────────────────────────────────────────────────
     // Push and rollback
     // ─────────────────────────────────────────────────────────────
 

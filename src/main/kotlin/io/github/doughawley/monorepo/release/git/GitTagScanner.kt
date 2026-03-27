@@ -67,7 +67,7 @@ class GitTagScanner(
      */
     fun tagExists(tag: String): Boolean {
         val output = executor.executeForOutput(rootDir, "tag", "-l", tag)
-        return output.isNotEmpty()
+        return output.any { it.trim() == tag }
     }
 
     private fun parseBranchFromLsRemoteLine(line: String, globalPrefix: String, projectPrefix: String): SemanticVersion? {

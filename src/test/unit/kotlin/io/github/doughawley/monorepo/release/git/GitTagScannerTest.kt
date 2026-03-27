@@ -219,4 +219,17 @@ class GitTagScannerTest : FunSpec({
         // then
         result shouldBe false
     }
+
+    test("tagExists returns false when output contains only non-tag lines like stderr trace output") {
+        // given: trace output from GIT_TRACE=1 merged via redirectErrorStream(true)
+        every {
+            executor.executeForOutput(rootDir, "tag", "-l", "release/app/v1.0.0")
+        } returns listOf("trace: built-in: git tag -l release/app/v1.0.0")
+
+        // when
+        val result = scanner.tagExists("release/app/v1.0.0")
+
+        // then
+        result shouldBe false
+    }
 })
