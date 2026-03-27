@@ -52,6 +52,16 @@ class GitReleaseExecutorTest : FunSpec({
         releaseExecutor.isDirty() shouldBe false
     }
 
+    test("isDirty throws GradleException when git status command fails") {
+        // given
+        every { executor.execute(rootDir, "status", "--porcelain") } returns
+            CommandResult(success = false, output = emptyList(), exitCode = 128, errorOutput = "fatal: not a git repository")
+
+        // when / then
+        val ex = shouldThrow<GradleException> { releaseExecutor.isDirty() }
+        ex.message shouldContain "Failed to check working tree status"
+    }
+
     // currentBranch
 
     test("currentBranch returns the branch name from git output") {
@@ -302,13 +312,14 @@ class GitReleaseExecutorTest : FunSpec({
         releaseExecutor.branchExistsLocally("release/app/v0.1.x") shouldBe false
     }
 
-    test("branchExistsLocally returns false when command fails") {
+    test("branchExistsLocally throws GradleException when command fails") {
         // given
         every { executor.execute(rootDir, "branch", "--list", "release/app/v0.1.x") } returns
             CommandResult(success = false, output = emptyList(), exitCode = 128, errorOutput = "fatal error")
 
         // when / then
-        releaseExecutor.branchExistsLocally("release/app/v0.1.x") shouldBe false
+        val ex = shouldThrow<GradleException> { releaseExecutor.branchExistsLocally("release/app/v0.1.x") }
+        ex.message shouldContain "Failed to list local branches"
     }
 
     // branchExistsOnRemote

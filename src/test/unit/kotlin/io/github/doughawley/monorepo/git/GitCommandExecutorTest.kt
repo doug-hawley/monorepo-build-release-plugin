@@ -1,9 +1,11 @@
 package io.github.doughawley.monorepo.git
 
+import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.collections.shouldContain
 import io.kotest.matchers.shouldBe
+import io.kotest.matchers.string.shouldContain
 import org.gradle.testfixtures.ProjectBuilder
 import java.io.File
 import java.nio.file.Files
@@ -199,17 +201,18 @@ class GitCommandExecutorTest : FunSpec({
         tempDir.deleteRecursively()
     }
 
-    test("executeForOutput should return empty list on failure") {
+    test("executeForOutput should throw RuntimeException on failure") {
         // given
         val tempDir = Files.createTempDirectory("test-for-output-fail").toFile()
         val logger = ProjectBuilder.builder().build().logger
         val executor = GitCommandExecutor(logger)
 
-        // when
-        val output = executor.executeForOutput(tempDir, "status")
-
-        // then
-        output.shouldBeEmpty()
+        // when / then
+        val ex = shouldThrow<RuntimeException> {
+            executor.executeForOutput(tempDir, "status")
+        }
+        ex.message shouldContain "Git command failed"
+        ex.message shouldContain "exit code 128"
         tempDir.deleteRecursively()
     }
 
