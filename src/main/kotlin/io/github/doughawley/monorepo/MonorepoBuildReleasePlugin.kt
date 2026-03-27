@@ -465,7 +465,7 @@ class MonorepoBuildReleasePlugin : Plugin<Project> {
             this.projectPath = sub.path
             this.buildDir.set(sub.layout.buildDirectory)
             this.releaseScopeProperty = sub.findProperty("release.scope") as? String
-            dependsOn("build")
+            dependsOn("buildChanged")
         }
     }
 
