@@ -4,6 +4,18 @@ All notable changes to this project will be documented in this file.
 
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.4.6](https://github.com/doug-hawley/monorepo-build-release-plugin/compare/v0.4.5...v0.4.6) (2026-04-03)
+
+
+### Features
+
+* add minimumVersion config for adopting plugin on existing projects ([ed40aba](https://github.com/doug-hawley/monorepo-build-release-plugin/commit/ed40abafc3b91cafe67f99ed3195d878ce5281a7)), closes [#150](https://github.com/doug-hawley/monorepo-build-release-plugin/issues/150)
+
+
+### Documentation
+
+* add minimumVersion to README ([625c79d](https://github.com/doug-hawley/monorepo-build-release-plugin/commit/625c79d05689cf32879a02350cc9a0570a83ddb4))
+
 ## [0.4.5](https://github.com/doug-hawley/monorepo-build-release-plugin/compare/v0.4.4...v0.4.5) (2026-03-27)
 
 
