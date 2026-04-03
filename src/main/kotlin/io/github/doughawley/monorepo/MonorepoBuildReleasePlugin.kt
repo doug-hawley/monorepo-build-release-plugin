@@ -11,6 +11,7 @@ import io.github.doughawley.monorepo.build.task.PrintChangedProjectsTask
 import io.github.doughawley.monorepo.release.MonorepoReleaseConfigExtension
 import io.github.doughawley.monorepo.release.MonorepoReleaseExtension
 import io.github.doughawley.monorepo.release.domain.Scope
+import io.github.doughawley.monorepo.release.domain.SemanticVersion
 import io.github.doughawley.monorepo.release.domain.TagPattern
 import io.github.doughawley.monorepo.release.git.ReleaseBranchCreator
 import io.github.doughawley.monorepo.release.task.ReleaseTask
@@ -181,15 +182,27 @@ class MonorepoBuildReleasePlugin : Plugin<Project> {
 
                 // Collect opted-in changed projects
                 val changedProjects = buildExt.allAffectedProjects
-                val optedInProjects = changedProjects.mapNotNull { projectPath ->
-                    val targetProject = rootProject.findProject(projectPath) ?: return@mapNotNull null
+                val optedInProjects = mutableMapOf<String, String>()
+                val minimumVersions = mutableMapOf<String, SemanticVersion>()
+                for (projectPath in changedProjects) {
+                    val targetProject = rootProject.findProject(projectPath) ?: continue
                     val projectExt = targetProject.extensions.findByType(MonorepoProjectExtension::class.java)
-                        ?: return@mapNotNull null
-                    if (!projectExt.release.enabled) return@mapNotNull null
+                        ?: continue
+                    if (!projectExt.release.enabled) continue
                     val tagPrefix = projectExt.release.tagPrefix
                         ?: TagPattern.deriveProjectTagPrefix(projectPath)
-                    projectPath to tagPrefix
-                }.toMap()
+                    optedInProjects[projectPath] = tagPrefix
+
+                    val minVersionStr = projectExt.release.minimumVersion
+                    if (minVersionStr != null) {
+                        val parsed = SemanticVersion.parse(minVersionStr)
+                            ?: throw GradleException(
+                                "Invalid minimumVersion '$minVersionStr' for project $projectPath. " +
+                                "Must be a valid semver string (e.g., '1.2.3')."
+                            )
+                        minimumVersions[projectPath] = parsed
+                    }
+                }
 
                 val tagUpdater = LastSuccessfulBuildTagUpdater(rootDir, executor, logger)
 
@@ -220,7 +233,7 @@ class MonorepoBuildReleasePlugin : Plugin<Project> {
                 // Create release branches
                 val tagScanner = GitTagScanner(rootDir, executor)
                 val releaseCreator = ReleaseBranchCreator(releaseExecutor, tagScanner, logger)
-                releaseCreator.releaseProjects(optedInProjects, releaseExt.globalTagPrefix, scope)
+                releaseCreator.releaseProjects(optedInProjects, releaseExt.globalTagPrefix, scope, minimumVersions)
 
                 // Update last-successful-build tag
                 tagUpdater.updateTag(buildExt.lastSuccessfulBuildTag)

@@ -51,6 +51,44 @@ class NextVersionResolverTest : FunSpec({
         result shouldBe SemanticVersion(1, 0, 0)
     }
 
+    // ── forMainBranch with minimumVersion ─────────────────────────
+
+    test("forMainBranch with no prior tags and minimumVersion bumps from minimum") {
+        // given — adopting plugin on a project whose latest external release is 1.2.3
+        val latestVersion: SemanticVersion? = null
+        val minimumVersion = SemanticVersion(1, 2, 3)
+
+        // when
+        val result = NextVersionResolver.forMainBranch(latestVersion, Scope.MINOR, minimumVersion)
+
+        // then — should bump minor from 1.2.3 → 1.3.0
+        result shouldBe SemanticVersion(1, 3, 0)
+    }
+
+    test("forMainBranch with no prior tags and minimumVersion bumps major from minimum") {
+        // given
+        val latestVersion: SemanticVersion? = null
+        val minimumVersion = SemanticVersion(1, 2, 3)
+
+        // when
+        val result = NextVersionResolver.forMainBranch(latestVersion, Scope.MAJOR, minimumVersion)
+
+        // then — should bump major from 1.2.3 → 2.0.0
+        result shouldBe SemanticVersion(2, 0, 0)
+    }
+
+    test("forMainBranch with existing tags above minimumVersion ignores minimum") {
+        // given — plugin tags already exceed the minimum
+        val latestVersion = SemanticVersion(3, 0, 0)
+        val minimumVersion = SemanticVersion(1, 2, 3)
+
+        // when
+        val result = NextVersionResolver.forMainBranch(latestVersion, Scope.MINOR, minimumVersion)
+
+        // then — tags win, bumps from 3.0.0 → 3.1.0
+        result shouldBe SemanticVersion(3, 1, 0)
+    }
+
     // ── forReleaseBranch ─────────────────────────────────────────
 
     test("forReleaseBranch with no prior tags in version line returns major.minor.0") {

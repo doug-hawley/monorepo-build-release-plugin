@@ -2,6 +2,7 @@ package io.github.doughawley.monorepo.release.git
 
 import io.github.doughawley.monorepo.git.GitCommandExecutor
 import io.github.doughawley.monorepo.release.domain.Scope
+import io.github.doughawley.monorepo.release.domain.SemanticVersion
 import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.collections.shouldBeEmpty
@@ -129,6 +130,21 @@ class ReleaseBranchCreatorIntegrationTest : FunSpec({
         // then: major bump → v1.0.x branch
         result.createdBranches shouldContainExactlyInAnyOrder listOf("release/app/v1.0.x")
         repoListener.repo.remoteBranchExists("release/app/v1.0.x") shouldBe true
+    }
+
+    test("uses minimumVersion as baseline when no tags exist") {
+        // given — adopting plugin on a project whose latest external release is 1.2.3
+        val creator = createCreator()
+        val projects = mapOf(":app" to "app")
+        val minimumVersions = mapOf(":app" to SemanticVersion(1, 2, 3))
+
+        // when
+        val result = creator.releaseProjects(projects, "release", Scope.MINOR, minimumVersions)
+
+        // then — bumps minor from 1.2.3 → 1.3.0, branch is v1.3.x
+        result.createdBranches shouldContainExactlyInAnyOrder listOf("release/app/v1.3.x")
+        result.projectToVersion[":app"]?.toString() shouldBe "1.3.0"
+        repoListener.repo.remoteBranchExists("release/app/v1.3.x") shouldBe true
     }
 
     test("rolls back all local branches when one already exists locally") {
