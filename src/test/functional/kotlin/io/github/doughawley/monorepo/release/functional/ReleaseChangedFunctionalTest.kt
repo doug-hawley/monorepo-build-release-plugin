@@ -481,6 +481,81 @@ class ReleaseChangedFunctionalTest : FunSpec({
     }
 
     // ─────────────────────────────────────────────────────────────
+    // minimumVersion — adoption scenario
+    // ─────────────────────────────────────────────────────────────
+
+    test("creates release branch starting from minimumVersion when no prior tags exist") {
+        // given: adopting plugin on a project whose latest external release is 1.2.3
+        val project = StandardReleaseTestProject.createAndInitialize(testListener.getTestProjectDir())
+        val appBuild = java.io.File(project.projectDir, "app/build.gradle.kts")
+        appBuild.writeText(
+            """
+            monorepoProject {
+                release {
+                    enabled = true
+                    minimumVersion = "1.2.3"
+                }
+            }
+
+            tasks.register("build") {
+                doLast {
+                    val libsDir = layout.buildDirectory.dir("libs").get().asFile
+                    libsDir.mkdirs()
+                    java.io.File(libsDir, "${'$'}{project.name}.jar").writeText("built artifact")
+                }
+            }
+            """.trimIndent()
+        )
+        project.commitAll("Set minimumVersion")
+        project.createTag("monorepo/last-successful-build")
+        project.pushTag("monorepo/last-successful-build")
+        project.modifyFile("app/src/main/kotlin/com/example/App.kt", "changed")
+        project.commitAll("Change app")
+
+        // when
+        val result = project.runTask("releaseChanged")
+
+        // then — bumps minor from 1.2.3 → branch v1.3.x
+        result.task(":releaseChanged")?.outcome shouldBe TaskOutcome.SUCCESS
+        project.remoteBranches() shouldContain "release/app/v1.3.x"
+    }
+
+    test("fails with clear error when minimumVersion is invalid") {
+        // given
+        val project = StandardReleaseTestProject.createAndInitialize(testListener.getTestProjectDir())
+        val appBuild = java.io.File(project.projectDir, "app/build.gradle.kts")
+        appBuild.writeText(
+            """
+            monorepoProject {
+                release {
+                    enabled = true
+                    minimumVersion = "not-a-version"
+                }
+            }
+
+            tasks.register("build") {
+                doLast {
+                    val libsDir = layout.buildDirectory.dir("libs").get().asFile
+                    libsDir.mkdirs()
+                    java.io.File(libsDir, "${'$'}{project.name}.jar").writeText("built artifact")
+                }
+            }
+            """.trimIndent()
+        )
+        project.commitAll("Set invalid minimumVersion")
+        project.createTag("monorepo/last-successful-build")
+        project.pushTag("monorepo/last-successful-build")
+        project.modifyFile("app/src/main/kotlin/com/example/App.kt", "changed")
+        project.commitAll("Change app")
+
+        // when
+        val result = project.runTaskAndFail("releaseChanged")
+
+        // then
+        result.output shouldContain "Invalid minimumVersion 'not-a-version'"
+    }
+
+    // ─────────────────────────────────────────────────────────────
     // All disabled
     // ─────────────────────────────────────────────────────────────
 

@@ -41,14 +41,15 @@ class ReleaseBranchCreator(
     fun releaseProjects(
         projects: Map<String, String>,
         globalPrefix: String,
-        scope: Scope
+        scope: Scope,
+        minimumVersions: Map<String, SemanticVersion> = emptyMap()
     ): ReleaseResult {
         if (projects.isEmpty()) {
             logger.lifecycle("No opted-in changed projects — nothing to release")
             return ReleaseResult(emptyList(), emptyMap(), emptyMap())
         }
 
-        val allResolved = resolveReleases(projects, globalPrefix, scope)
+        val allResolved = resolveReleases(projects, globalPrefix, scope, minimumVersions)
 
         val branches = allResolved.values.map { it.branch }
 
@@ -99,13 +100,15 @@ class ReleaseBranchCreator(
     private fun resolveReleases(
         projects: Map<String, String>,
         globalPrefix: String,
-        scope: Scope
+        scope: Scope,
+        minimumVersions: Map<String, SemanticVersion>
     ): Map<String, ResolvedRelease> {
-        return projects.mapValues { (_, projectPrefix) ->
+        return projects.mapValues { (projectPath, projectPrefix) ->
             val latestTagVersion = gitTagScanner.findLatestVersion(globalPrefix, projectPrefix)
             val latestBranchVersion = gitTagScanner.findLatestBranchVersion(globalPrefix, projectPrefix)
             val latestVersion = maxOfNullable(latestTagVersion, latestBranchVersion)
-            val nextVersion = NextVersionResolver.forMainBranch(latestVersion, scope)
+            val minimumVersion = minimumVersions[projectPath]
+            val nextVersion = NextVersionResolver.forMainBranch(latestVersion, scope, minimumVersion)
             ResolvedRelease(
                 version = nextVersion,
                 branch = TagPattern.formatReleaseBranch(globalPrefix, projectPrefix, nextVersion)

@@ -20,11 +20,24 @@ object NextVersionResolver {
      * @param latestVersion the highest existing version across all version lines, or null if no tags exist
      * @param scope the bump scope (major or minor)
      */
-    fun forMainBranch(latestVersion: SemanticVersion?, scope: Scope): SemanticVersion {
-        return if (latestVersion == null) {
+    fun forMainBranch(
+        latestVersion: SemanticVersion?,
+        scope: Scope,
+        minimumVersion: SemanticVersion? = null
+    ): SemanticVersion {
+        val effectiveLatest = maxOfNullable(latestVersion, minimumVersion)
+        return if (effectiveLatest == null) {
             SemanticVersion(0, 1, 0)
         } else {
-            latestVersion.bump(scope)
+            effectiveLatest.bump(scope)
+        }
+    }
+
+    private fun <T : Comparable<T>> maxOfNullable(a: T?, b: T?): T? {
+        return when {
+            a == null -> b
+            b == null -> a
+            else -> maxOf(a, b)
         }
     }
 
