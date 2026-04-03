@@ -115,6 +115,19 @@ monorepoProject {
 }
 ```
 
+When adopting the plugin on a project that already has released versions from a different release mechanism, set `minimumVersion` so the plugin starts versioning past existing releases:
+
+```kotlin
+monorepoProject {
+    release {
+        enabled = true
+        minimumVersion = "2.4.0"  // existing releases go up to 2.4.0
+    }
+}
+```
+
+With `primaryBranchScope = "minor"`, the first release branch will be `release/{project}/v2.5.x`. Once the project has released past the minimum, the config can be removed.
+
 ### Global configuration
 
 ```kotlin
@@ -407,6 +420,7 @@ Applied per subproject to opt in to release management.
 |----------|------|---------|-------------|
 | `enabled` | Boolean | `false` | Whether this subproject participates in releases |
 | `tagPrefix` | String? | `null` | Override the auto-derived tag prefix (default derives from Gradle path: `:api:core` → `api-core`) |
+| `minimumVersion` | String? | `null` | Version floor for adoption scenarios (e.g., `"2.4.0"`). When set, the plugin treats this as the baseline if no higher plugin-managed tags exist. Must be a valid semver string. |
 
 ### Gradle Properties
 
