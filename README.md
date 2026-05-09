@@ -161,6 +161,68 @@ Releases a single subproject from its release branch for patch releases. Must be
 
 The task will fail if run from `main`, a feature branch, or a release branch belonging to a different project.
 
+### Dev Releases
+
+Dev releases let you build and release experimental features from non-main branches for staging or testing. They are completely decoupled from stable versioning — no semver, no release branches, just simple incrementing tags.
+
+#### Creating a dev branch
+
+Create a dedicated dev branch for a subproject:
+
+```bash
+./gradlew :app:createDevBranch -Pdev.branch.name=feature-auth
+```
+
+This creates and pushes a branch named `dev/app/feature-auth`. The branch name must start with a letter or digit and contain only letters, digits, `.`, `_`, or `-`. Multiple dev branches can exist per project simultaneously. Requires `release { enabled = true }` on the subproject.
+
+#### `:subproject:devRelease`
+
+Creates a dev release tag from a dev branch. Must be run from a matching dev branch (e.g., `:app:devRelease` must be run from `dev/app/<name>`):
+
+```bash
+./gradlew :app:devRelease
+```
+
+The task:
+1. Builds the project (always — no change detection)
+2. Scans existing dev tags and auto-increments the number
+3. Creates a tag like `dev/app/feature-auth/1` (then `/2`, `/3`, etc.)
+4. Writes the version to `build/release-version.txt` (e.g., `feature-auth.1`)
+
+Requires `release { enabled = true }` on the subproject.
+
+#### Dev release naming conventions
+
+| Element | Format | Example |
+|---------|--------|---------|
+| Branch | `dev/<project-prefix>/<name>` | `dev/app/feature-auth` |
+| Tag | `dev/<project-prefix>/<name>/<N>` | `dev/app/feature-auth/1` |
+| Version | `<name>.<N>` | `feature-auth.1` |
+
+The project prefix is derived the same way as stable releases — from `tagPrefix` config or Gradle path.
+
+#### Dev release workflow
+
+```bash
+# 1. Create the dev branch
+./gradlew :app:createDevBranch -Pdev.branch.name=feature-auth
+
+# 2. Check out the branch, make changes
+git checkout dev/app/feature-auth
+# ... develop, commit, push ...
+
+# 3. Release from the dev branch (CI or manual)
+./gradlew :app:devRelease
+# → tag: dev/app/feature-auth/1, version: feature-auth.1
+
+# 4. Continue developing and releasing
+# ... more commits ...
+./gradlew :app:devRelease
+# → tag: dev/app/feature-auth/2, version: feature-auth.2
+
+# 5. When ready, merge to main and use the normal release flow
+```
+
 ### Versioning rules
 
 - Release branches follow the pattern `{globalTagPrefix}/{projectPrefix}/v{major}.{minor}.x`
@@ -429,6 +491,7 @@ Command-line properties passed via `-P`:
 | Property | Applies To | Description |
 |----------|-----------|-------------|
 | `monorepo.targetBranch` | `buildChanged`, `printChanged`, per-project `buildChanged` | Overrides the default `origin/{primaryBranch}` baseline with `origin/{value}`. Accepts both `release/v1.x` and `origin/release/v1.x`. The branch is fetched from origin if not available locally. If the ref doesn't exist, all projects are treated as changed. Has no effect on `releaseChanged`. |
+| `dev.branch.name` | `createDevBranch` | Name for the dev branch (e.g., `feature-auth`). Required. Must start with a letter or digit and contain only letters, digits, `.`, `_`, or `-`. |
 
 ## Troubleshooting
 

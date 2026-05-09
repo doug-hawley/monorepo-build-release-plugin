@@ -13,7 +13,10 @@ import io.github.doughawley.monorepo.release.MonorepoReleaseExtension
 import io.github.doughawley.monorepo.release.domain.Scope
 import io.github.doughawley.monorepo.release.domain.SemanticVersion
 import io.github.doughawley.monorepo.release.domain.TagPattern
+import io.github.doughawley.monorepo.release.git.DevTagScanner
 import io.github.doughawley.monorepo.release.git.ReleaseBranchCreator
+import io.github.doughawley.monorepo.release.task.CreateDevBranchTask
+import io.github.doughawley.monorepo.release.task.DevReleaseTask
 import io.github.doughawley.monorepo.release.task.ReleaseTask
 import io.github.doughawley.monorepo.git.GitCommandExecutor
 import io.github.doughawley.monorepo.release.git.GitReleaseExecutor
@@ -65,6 +68,7 @@ class MonorepoBuildReleasePlugin : Plugin<Project> {
             val projectExtension = sub.extensions.findByType(MonorepoProjectExtension::class.java)
                 ?: sub.extensions.create("monorepoProject", MonorepoProjectExtension::class.java)
             registerReleaseTasks(sub, rootReleaseExtension, projectExtension.release)
+            registerDevReleaseTasks(sub, rootExtension, projectExtension.release)
         }
 
         // Register per-subproject buildChanged tasks eagerly.
@@ -505,6 +509,38 @@ class MonorepoBuildReleasePlugin : Plugin<Project> {
             this.buildDir.set(sub.layout.buildDirectory)
             this.releaseScopeProperty = sub.findProperty("release.scope") as? String
             dependsOn("build", "buildChanged")
+        }
+    }
+
+    private fun registerDevReleaseTasks(
+        sub: Project,
+        rootExtension: MonorepoExtension,
+        config: MonorepoReleaseConfigExtension
+    ) {
+        val executor = GitCommandExecutor(sub.logger)
+        val devTagScanner = DevTagScanner(sub.rootProject.rootDir, executor)
+        val releaseExecutor = GitReleaseExecutor(sub.rootProject.rootDir, executor, sub.logger)
+
+        sub.tasks.register("createDevBranch", CreateDevBranchTask::class.java) {
+            group = TASK_GROUP
+            description = "Creates a dev branch for this project"
+            this.gitReleaseExecutor = releaseExecutor
+            this.devTagScanner = devTagScanner
+            this.projectPath = sub.path
+            this.projectConfig = config
+            this.devBranchNameProperty = sub.findProperty("dev.branch.name") as? String
+            this.primaryBranch = rootExtension.primaryBranch
+        }
+
+        sub.tasks.register("devRelease", DevReleaseTask::class.java) {
+            group = TASK_GROUP
+            description = "Creates a dev release tag for this project"
+            this.gitReleaseExecutor = releaseExecutor
+            this.devTagScanner = devTagScanner
+            this.projectPath = sub.path
+            this.projectConfig = config
+            this.buildDir.set(sub.layout.buildDirectory)
+            dependsOn("build")
         }
     }
 
