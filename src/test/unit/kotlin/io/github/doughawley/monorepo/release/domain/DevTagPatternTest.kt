@@ -118,6 +118,8 @@ class DevTagPatternTest : FunSpec({
             "v2-migration",
             "a",
             "A123_test.name-ok",
+            "123-feature",
+            "0day-fix",
         ) { name ->
             // should not throw
             DevTagPattern.validateBranchName(name)
