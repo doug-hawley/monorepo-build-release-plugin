@@ -31,7 +31,15 @@ abstract class CreateDevBranchTask : DefaultTask() {
 
     @TaskAction
     fun createDevBranch() {
-        // 1. Validate branch name is provided
+        // 1. Opt-in check
+        if (!projectConfig.enabled) {
+            throw GradleException(
+                "Release is not enabled for $projectPath. " +
+                "Set monorepoProject { release { enabled = true } } to opt in."
+            )
+        }
+
+        // 2. Validate branch name is provided
         val branchName = devBranchNameProperty
         if (branchName.isNullOrBlank()) {
             throw GradleException(

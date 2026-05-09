@@ -136,7 +136,7 @@ class CreateDevBranchFunctionalTest : FunSpec({
         project.remoteBranches() shouldContain "dev/my-custom-app/feature-auth"
     }
 
-    test("does not require release enabled to create a dev branch") {
+    test("fails when release is not enabled") {
         // given
         val projectDir = testListener.getTestProjectDir()
         val project = StandardReleaseTestProject.create(projectDir)
@@ -163,14 +163,13 @@ class CreateDevBranchFunctionalTest : FunSpec({
         project.pushToRemote()
 
         // when
-        val result = project.runTask(
+        val result = project.runTaskAndFail(
             ":app:createDevBranch",
             properties = mapOf("dev.branch.name" to "feature-auth")
         )
 
         // then
-        result.task(":app:createDevBranch")?.outcome shouldBe TaskOutcome.SUCCESS
-        project.remoteBranches() shouldContain "dev/app/feature-auth"
+        result.output shouldContain "Release is not enabled"
     }
 
     test("fails when branch name starts with a dash") {

@@ -173,9 +173,7 @@ Create a dedicated dev branch for a subproject:
 ./gradlew :app:createDevBranch -Pdev.branch.name=feature-auth
 ```
 
-This creates and pushes a branch named `dev/app/feature-auth`. The branch name must start with a letter or digit and contain only letters, digits, `.`, `_`, or `-`. Multiple dev branches can exist per project simultaneously.
-
-`createDevBranch` does not require `release { enabled = true }` — any subproject can create a dev branch.
+This creates and pushes a branch named `dev/app/feature-auth`. The branch name must start with a letter or digit and contain only letters, digits, `.`, `_`, or `-`. Multiple dev branches can exist per project simultaneously. Requires `release { enabled = true }` on the subproject.
 
 #### `:subproject:devRelease`
 
