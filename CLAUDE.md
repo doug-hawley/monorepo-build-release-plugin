@@ -55,6 +55,10 @@ GitChangedFilesDetector  →  ProjectFileMapper  →  ProjectMetadataFactory  �
 | `release/git/GitReleaseExecutor` | Pushes tags and release branches via git; supports atomic multi-ref push |
 | `release/git/ReleaseBranchCreator` | Two-phase release branch creation: create locally → `git push --atomic` → rollback on failure; scans tags and branches for version resolution |
 | `build/git/LastSuccessfulBuildTagUpdater` | Force-updates and pushes the last-successful-build tag after successful builds |
+| `release/domain/DevTagPattern` | Formatting, parsing, and validation for dev branch/tag naming conventions (`dev/<project>/<name>/<N>`) |
+| `release/git/DevTagScanner` | Scans remote for dev release tags and branches via `git ls-remote` |
+| `release/task/CreateDevBranchTask` | Creates a dev branch for a subproject and pushes it; validates name and checks for conflicts |
+| `release/task/DevReleaseTask` | Creates incrementing dev release tags from a dev branch; writes `release-version.txt` |
 | `git/GitCommandExecutor` | Low-level `ProcessBuilder` wrapper for executing git commands |
 
 **Root project special case**: The root project is marked as changed only when files in the root directory (not inside any subproject directory) have changed.
@@ -79,6 +83,8 @@ The functional tests use a standard 5-module dependency tree (`common-lib` ← `
 | `ReleaseTaskFunctionalTest.kt` | `release` (per-subproject) |
 | `PerProjectBuildChangedFunctionalTest.kt` | `:sub:buildChanged` (per-subproject) |
 | `ReleaseChangedFunctionalTest.kt` | `releaseChanged` |
+| `CreateDevBranchFunctionalTest.kt` | `createDevBranch` (per-subproject) |
+| `DevReleaseFunctionalTest.kt` | `devRelease` (per-subproject) |
 
 ## Code Style
 
