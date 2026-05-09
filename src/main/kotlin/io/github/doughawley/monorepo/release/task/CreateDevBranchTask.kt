@@ -29,6 +29,9 @@ abstract class CreateDevBranchTask : DefaultTask() {
     @get:Internal
     var devBranchNameProperty: String? = null
 
+    @get:Internal
+    lateinit var primaryBranch: String
+
     @TaskAction
     fun createDevBranch() {
         // 1. Opt-in check
@@ -39,7 +42,16 @@ abstract class CreateDevBranchTask : DefaultTask() {
             )
         }
 
-        // 2. Validate branch name is provided
+        // 2. Branch guard — must be on primaryBranch
+        val currentBranch = gitReleaseExecutor.currentBranch()
+        if (currentBranch != primaryBranch) {
+            throw GradleException(
+                "createDevBranch must be run from '$primaryBranch', " +
+                "but the current branch is '$currentBranch'."
+            )
+        }
+
+        // 3. Validate branch name is provided
         val branchName = devBranchNameProperty
         if (branchName.isNullOrBlank()) {
             throw GradleException(
@@ -48,17 +60,17 @@ abstract class CreateDevBranchTask : DefaultTask() {
             )
         }
 
-        // 2. Validate branch name characters
+        // 4. Validate branch name characters
         DevTagPattern.validateBranchName(branchName)
 
-        // 3. Determine project prefix
+        // 5. Determine project prefix
         val projectPrefix = projectConfig.tagPrefix
             ?: TagPattern.deriveProjectTagPrefix(projectPath)
 
-        // 4. Format the full branch name
+        // 6. Format the full branch name
         val fullBranch = DevTagPattern.formatDevBranch(projectPrefix, branchName)
 
-        // 5. Check remote for existing branch
+        // 7. Check remote for existing branch
         if (devTagScanner.devBranchExistsOnRemote(projectPrefix, branchName)) {
             throw GradleException(
                 "Dev branch '$fullBranch' already exists on the remote. " +
@@ -66,7 +78,7 @@ abstract class CreateDevBranchTask : DefaultTask() {
             )
         }
 
-        // 6. Check local for existing branch
+        // 8. Check local for existing branch
         if (gitReleaseExecutor.branchExistsLocally(fullBranch)) {
             throw GradleException(
                 "Dev branch '$fullBranch' already exists locally. " +
@@ -74,10 +86,10 @@ abstract class CreateDevBranchTask : DefaultTask() {
             )
         }
 
-        // 7. Create branch locally
+        // 9. Create branch locally
         gitReleaseExecutor.createBranchLocally(fullBranch)
 
-        // 8. Push to remote (with rollback on failure)
+        // 10. Push to remote (with rollback on failure)
         try {
             gitReleaseExecutor.pushBranch(fullBranch)
         } catch (e: GradleException) {
@@ -85,6 +97,9 @@ abstract class CreateDevBranchTask : DefaultTask() {
             gitReleaseExecutor.deleteLocalBranch(fullBranch)
             throw e
         }
+
+        // 11. Check out the new branch so the developer is ready to work
+        gitReleaseExecutor.checkoutBranch(fullBranch)
 
         logger.lifecycle("Created dev branch: $fullBranch")
     }

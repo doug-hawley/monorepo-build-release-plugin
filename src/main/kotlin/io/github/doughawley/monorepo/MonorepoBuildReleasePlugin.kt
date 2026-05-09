@@ -68,7 +68,7 @@ class MonorepoBuildReleasePlugin : Plugin<Project> {
             val projectExtension = sub.extensions.findByType(MonorepoProjectExtension::class.java)
                 ?: sub.extensions.create("monorepoProject", MonorepoProjectExtension::class.java)
             registerReleaseTasks(sub, rootReleaseExtension, projectExtension.release)
-            registerDevReleaseTasks(sub, projectExtension.release)
+            registerDevReleaseTasks(sub, rootExtension, projectExtension.release)
         }
 
         // Register per-subproject buildChanged tasks eagerly.
@@ -514,6 +514,7 @@ class MonorepoBuildReleasePlugin : Plugin<Project> {
 
     private fun registerDevReleaseTasks(
         sub: Project,
+        rootExtension: MonorepoExtension,
         config: MonorepoReleaseConfigExtension
     ) {
         val executor = GitCommandExecutor(sub.logger)
@@ -528,6 +529,7 @@ class MonorepoBuildReleasePlugin : Plugin<Project> {
             this.projectPath = sub.path
             this.projectConfig = config
             this.devBranchNameProperty = sub.findProperty("dev.branch.name") as? String
+            this.primaryBranch = rootExtension.primaryBranch
         }
 
         sub.tasks.register("devRelease", DevReleaseTask::class.java) {

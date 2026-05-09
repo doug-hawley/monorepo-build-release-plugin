@@ -103,6 +103,14 @@ class GitReleaseExecutor(
         logger.lifecycle("Pushed ${refs.size} ref(s) atomically to remote")
     }
 
+    fun checkoutBranch(branch: String) {
+        val result = executor.execute(rootDir, "checkout", branch)
+        if (!result.success) {
+            throw GradleException("Failed to checkout branch '$branch': ${result.errorOutput}")
+        }
+        logger.lifecycle("Checked out branch: $branch")
+    }
+
     fun branchExistsLocally(branch: String): Boolean {
         val result = executor.execute(rootDir, "branch", "--list", branch)
         if (!result.success) {
