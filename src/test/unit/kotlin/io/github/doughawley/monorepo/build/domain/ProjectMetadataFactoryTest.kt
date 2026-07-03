@@ -500,6 +500,105 @@ class ProjectMetadataFactoryTest : FunSpec({
         serviceMetadata.dependencies[0].fullyQualifiedName shouldBe ":platform"
     }
 
+    test("should not recurse infinitely on self-referencing dependency") {
+        // given: a project that declares a dependency on itself, as java-test-fixtures does
+        // via testImplementation(testFixtures(project)) (issue #204)
+        val rootProject = ProjectBuilder.builder().build()
+        val lib = ProjectBuilder.builder()
+            .withParent(rootProject)
+            .withName("lib")
+            .build()
+
+        lib.pluginManager.apply("java-library")
+        lib.dependencies.add("testImplementation", lib)
+
+        val logger = rootProject.logger
+        val factory = ProjectMetadataFactory(logger)
+
+        // when
+        val metadataMap = factory.buildProjectMetadataMap(rootProject)
+
+        // then: the self-reference is dropped instead of overflowing the stack
+        val libMetadata = metadataMap[":lib"]
+        libMetadata shouldNotBe null
+        libMetadata!!.dependencies shouldHaveSize 0
+    }
+
+    test("should not recurse infinitely when java-test-fixtures plugin is applied") {
+        // given: java-test-fixtures automatically adds a ProjectDependency on the project itself
+        val rootProject = ProjectBuilder.builder().build()
+        val lib = ProjectBuilder.builder()
+            .withParent(rootProject)
+            .withName("lib")
+            .build()
+        val app = ProjectBuilder.builder()
+            .withParent(rootProject)
+            .withName("app")
+            .build()
+
+        lib.pluginManager.apply("java-library")
+        lib.pluginManager.apply("java-test-fixtures")
+        app.pluginManager.apply("java-library")
+        app.dependencies.add("implementation", lib)
+
+        val logger = rootProject.logger
+        val factory = ProjectMetadataFactory(logger)
+
+        // when
+        val metadataMap = factory.buildProjectMetadataMap(rootProject)
+
+        // then: real dependencies are preserved, the self-reference is dropped
+        val libMetadata = metadataMap[":lib"]
+        libMetadata shouldNotBe null
+        libMetadata!!.dependencies shouldHaveSize 0
+
+        val appMetadata = metadataMap[":app"]
+        appMetadata shouldNotBe null
+        appMetadata!!.dependencies shouldHaveSize 1
+        appMetadata.dependencies[0].fullyQualifiedName shouldBe ":lib"
+    }
+
+    test("should not recurse infinitely on cross-configuration dependency cycle") {
+        // given: :lib-a testImplementation-depends on :lib-b while :lib-b
+        // implementation-depends on :lib-a — legal in Gradle, but a declared cycle (issue #204)
+        val rootProject = ProjectBuilder.builder().build()
+        val libA = ProjectBuilder.builder()
+            .withParent(rootProject)
+            .withName("lib-a")
+            .build()
+        val libB = ProjectBuilder.builder()
+            .withParent(rootProject)
+            .withName("lib-b")
+            .build()
+
+        libA.pluginManager.apply("java-library")
+        libB.pluginManager.apply("java-library")
+        libA.dependencies.add("testImplementation", libB)
+        libB.dependencies.add("implementation", libA)
+
+        val logger = rootProject.logger
+        val factory = ProjectMetadataFactory(logger)
+
+        val changedFilesMap = mapOf(
+            ":lib-b" to listOf("lib-b/File.kt")
+        )
+
+        // when
+        val metadataMap = factory.buildProjectMetadataMap(rootProject, changedFilesMap)
+
+        // then: metadata is built for both projects without overflowing the stack,
+        // and change detection still propagates along the retained edge
+        val libAMetadata = metadataMap[":lib-a"]
+        libAMetadata shouldNotBe null
+        libAMetadata!!.dependencies shouldHaveSize 1
+        libAMetadata.dependencies[0].fullyQualifiedName shouldBe ":lib-b"
+        libAMetadata.hasChanges() shouldBe true
+
+        val libBMetadata = metadataMap[":lib-b"]
+        libBMetadata shouldNotBe null
+        libBMetadata!!.hasChanges() shouldBe true
+    }
+
     test("should handle projects with no changes in changed files map") {
         // given
         val rootProject = ProjectBuilder.builder().build()
