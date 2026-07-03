@@ -425,19 +425,60 @@ class MonorepoBuildReleasePlugin : Plugin<Project> {
         val monorepoProjects = MonorepoProjects(metadataMap.values.toList())
         extension.monorepoProjects = monorepoProjects
 
-        val allAffectedProjects = monorepoProjects.getChangedProjectPaths()
+        val allAffectedProjects = computeAffectedProjects(
+            project.rootProject,
+            extension,
+            filteredChangedFilesMap,
+            monorepoProjects,
+            logger
+        )
+        extension.allAffectedProjects = allAffectedProjects
+
+        logger.info("Changed files count: ${changedFiles.size}")
+        logger.info("All affected projects (including dependents): ${allAffectedProjects.joinToString(", ").ifEmpty { "none" }}")
+    }
+
+    /**
+     * Computes the set of affected project paths.
+     *
+     * Changed files attributed to the root project (not inside any subproject directory)
+     * that match [MonorepoBuildExtension.rootTriggerPatterns] — the root build script,
+     * version catalogs, buildSrc, etc. — affect how every subproject builds, so all
+     * projects with build files are treated as affected. Otherwise the affected set is
+     * the changed projects (including transitive dependents), excluding the root project
+     * and projects without build files.
+     */
+    private fun computeAffectedProjects(
+        rootProject: Project,
+        extension: MonorepoBuildExtension,
+        changedFilesMap: Map<String, List<String>>,
+        monorepoProjects: MonorepoProjects,
+        logger: Logger
+    ): Set<String> {
+        val triggerPatterns = extension.rootTriggerPatterns.map { Regex(it) }
+        val rootTriggerFiles = (changedFilesMap[rootProject.path] ?: emptyList())
+            .filter { file -> triggerPatterns.any { pattern -> file.matches(pattern) } }
+
+        if (rootTriggerFiles.isNotEmpty()) {
+            logger.lifecycle(
+                "Root-level build files changed (${rootTriggerFiles.joinToString(", ")}) — " +
+                "treating all projects as affected"
+            )
+            return rootProject.subprojects
+                .map { it.path }
+                .filter { path -> hasBuildFile(rootProject, path) }
+                .toSet()
+        }
+
+        return monorepoProjects.getChangedProjectPaths()
             .filter { path ->
-                path != ":" && hasBuildFile(project.rootProject, path).also { hasBuild ->
+                path != ":" && hasBuildFile(rootProject, path).also { hasBuild ->
                     if (!hasBuild) {
                         logger.debug("Excluding $path from affected projects: no build file found")
                     }
                 }
             }
             .toSet()
-        extension.allAffectedProjects = allAffectedProjects
-
-        logger.info("Changed files count: ${changedFiles.size}")
-        logger.info("All affected projects (including dependents): ${allAffectedProjects.joinToString(", ").ifEmpty { "none" }}")
     }
 
     /**

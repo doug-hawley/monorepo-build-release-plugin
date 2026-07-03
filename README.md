@@ -37,6 +37,33 @@ monorepo {
             ".*\\.md",
             "docs/.*"
         )
+        rootTriggerPatterns = listOf(   // regex patterns for root-level files that affect all projects; defaults shown below
+            "build\\.gradle(\\.kts)?",
+            "settings\\.gradle(\\.kts)?",
+            "gradle\\.properties",
+            "gradle/.*\\.versions\\.toml",
+            "buildSrc/.*",
+            "gradle/wrapper/.*"
+        )
+    }
+}
+```
+
+#### Root-level trigger files (`rootTriggerPatterns`)
+
+Changed files that are not inside any subproject directory are attributed to the root project. When such a file matches one of the `rootTriggerPatterns`, **all projects are treated as affected**, because these files can change how every subproject builds. Other root-level files (e.g. a root `README.md`) do not affect any project.
+
+How matching works:
+
+- Patterns are regular expressions matched against the **full file path relative to the repository root**, using forward slashes (e.g. `gradle/libs.versions.toml`).
+- Only files **outside every subproject directory** are checked — a subproject's own `build.gradle.kts` still affects just that project and its dependents.
+- The defaults cover the root build script, settings script, `gradle.properties`, version catalogs (`gradle/*.versions.toml`), `buildSrc` sources, and the Gradle wrapper.
+- Assigning a new list **replaces** the defaults. To extend them instead, append to the current value:
+
+```kotlin
+monorepo {
+    build {
+        rootTriggerPatterns = rootTriggerPatterns + listOf("config/.*")
     }
 }
 ```
@@ -396,6 +423,7 @@ jobs:
 | `lastSuccessfulBuildTag` | String | `"monorepo/last-successful-build"` | Tag name used as the anchor for change detection; updated automatically after successful builds |
 | `includeUntracked` | Boolean | `true` | Whether to include untracked, staged, and working-tree files in detection |
 | `excludePatterns` | List\<String\> | `[]` | Regex patterns for files to exclude globally across all projects |
+| `rootTriggerPatterns` | List\<String\> | root build/settings scripts, `gradle.properties`, `gradle/*.versions.toml`, `buildSrc/**`, `gradle/wrapper/**` | Regex patterns for root-level files (outside any subproject) that affect the build of every project; a match marks all projects as affected |
 
 ### `monorepoProject { build { } }`
 
@@ -460,6 +488,10 @@ Check your `excludePatterns` configuration - you may be inadvertently excluding 
 ### Root project always shows as changed
 
 This is expected if files in the root directory (outside of subproject directories) have changed. To prevent this, ensure all code is within subproject directories.
+
+### All projects marked as affected after a root-level change
+
+When a root-level file matching `rootTriggerPatterns` changes (root build script, version catalog, `buildSrc`, etc.), all projects are treated as affected because those files can change how every subproject builds. If a root-level file is being over-matched, adjust `rootTriggerPatterns` in `monorepo { build { } }`.
 
 ## Support & Contributions
 

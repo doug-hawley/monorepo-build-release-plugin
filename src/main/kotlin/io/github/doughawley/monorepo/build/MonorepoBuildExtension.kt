@@ -33,6 +33,26 @@ open class MonorepoBuildExtension {
     var excludePatterns: List<String> = listOf()
 
     /**
+     * Regex patterns for root-level files that affect the build of every project.
+     *
+     * Changed files that are not inside any subproject directory are attributed to the
+     * root project. When such a file matches one of these patterns, all projects are
+     * treated as affected, because files like the root build script, the version catalog,
+     * or buildSrc sources can change how every subproject builds.
+     *
+     * Patterns are matched against the full file path relative to the root project
+     * (forward slashes). Assigning a new list replaces the defaults.
+     */
+    var rootTriggerPatterns: List<String> = listOf(
+        "build\\.gradle(\\.kts)?",
+        "settings\\.gradle(\\.kts)?",
+        "gradle\\.properties",
+        "gradle/.*\\.versions\\.toml",
+        "buildSrc/.*",
+        "gradle/wrapper/.*"
+    )
+
+    /**
      * The ref that was actually used for change detection, or null when no baseline exists
      * (all projects treated as changed). Set internally after ref resolution.
      *

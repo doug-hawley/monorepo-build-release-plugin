@@ -50,6 +50,14 @@ class MonorepoBuildPluginTest : FunSpec({
         buildExtension.lastSuccessfulBuildTag shouldBe "monorepo/last-successful-build"
         buildExtension.includeUntracked shouldBe true
         buildExtension.excludePatterns shouldBe emptyList()
+        buildExtension.rootTriggerPatterns shouldBe listOf(
+            "build\\.gradle(\\.kts)?",
+            "settings\\.gradle(\\.kts)?",
+            "gradle\\.properties",
+            "gradle/.*\\.versions\\.toml",
+            "buildSrc/.*",
+            "gradle/wrapper/.*"
+        )
     }
 
     test("extension can be configured") {

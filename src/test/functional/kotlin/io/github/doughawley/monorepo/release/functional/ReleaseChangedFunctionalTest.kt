@@ -124,6 +124,32 @@ class ReleaseChangedFunctionalTest : FunSpec({
     }
 
     // ─────────────────────────────────────────────────────────────
+    // Root-level shared build files (issue #205)
+    // ─────────────────────────────────────────────────────────────
+
+    test("creates release branches for all opted-in projects when the version catalog changes") {
+        // given: a dependency bump in the version catalog merged after the last successful build
+        val project = StandardReleaseTestProject.createMultiProjectAndInitialize(testListener.getTestProjectDir())
+        project.createTag("monorepo/last-successful-build")
+        project.pushTag("monorepo/last-successful-build")
+        project.modifyFile("gradle/libs.versions.toml", "[versions]\nsome-lib = \"2.0.0\"")
+        project.commitAll("Bump dependency version in catalog")
+        val headCommit = project.headCommit()
+
+        // when
+        val result = project.runTask("releaseChanged")
+
+        // then: the catalog change is built and released, not silently dropped
+        result.task(":releaseChanged")?.outcome shouldBe TaskOutcome.SUCCESS
+        result.output shouldNotContain "No projects have changed"
+        result.task(":app:build")?.outcome shouldBe TaskOutcome.SUCCESS
+        result.task(":lib:build")?.outcome shouldBe TaskOutcome.SUCCESS
+        project.remoteBranches() shouldContain "release/app/v0.1.x"
+        project.remoteBranches() shouldContain "release/lib/v0.1.x"
+        project.remoteTagCommit("monorepo/last-successful-build") shouldBe headCommit
+    }
+
+    // ─────────────────────────────────────────────────────────────
     // Tag-based baseline (not origin/main)
     // ─────────────────────────────────────────────────────────────
 

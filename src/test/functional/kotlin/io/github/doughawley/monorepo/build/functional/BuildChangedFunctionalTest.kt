@@ -520,6 +520,67 @@ class BuildChangedFunctionalTest : FunSpec({
     }
 
     // ─────────────────────────────────────────────────────────────
+    // Root-level shared build files (issue #205)
+    // ─────────────────────────────────────────────────────────────
+
+    test("buildChanged builds all projects when the version catalog changes") {
+        // given
+        val project = testProjectListener.createStandardProject()
+        project.createNewFile("gradle/libs.versions.toml", "[versions]\nsome-lib = \"2.0.0\"")
+        project.commitAll("Bump dependency version in catalog")
+
+        // when
+        val result = project.runTask("buildChanged")
+
+        // then: the catalog affects every project's build
+        result.task(":buildChanged")?.outcome shouldBe TaskOutcome.SUCCESS
+        result.extractBuiltProjects() shouldContainAll setOf(
+            Projects.PLATFORM,
+            Projects.COMMON_LIB,
+            Projects.MODULE1,
+            Projects.MODULE2,
+            Projects.APP1,
+            Projects.APP2
+        )
+    }
+
+    test("buildChanged builds all projects when the root build script changes") {
+        // given
+        val project = testProjectListener.createStandardProject()
+        project.appendToFile("build.gradle.kts", "\n// allprojects configuration change")
+        project.commitAll("Change root build script")
+
+        // when
+        val result = project.runTask("buildChanged")
+
+        // then
+        result.task(":buildChanged")?.outcome shouldBe TaskOutcome.SUCCESS
+        result.extractBuiltProjects() shouldContainAll setOf(
+            Projects.PLATFORM,
+            Projects.COMMON_LIB,
+            Projects.MODULE1,
+            Projects.MODULE2,
+            Projects.APP1,
+            Projects.APP2
+        )
+    }
+
+    test("buildChanged builds nothing when a non-build root file changes") {
+        // given
+        val project = testProjectListener.createStandardProject()
+        project.createNewFile("README.md", "# Documentation only")
+        project.commitAll("Add readme")
+
+        // when
+        val result = project.runTask("buildChanged")
+
+        // then: a docs-only root change does not affect any project
+        result.task(":buildChanged")?.outcome shouldBe TaskOutcome.SUCCESS
+        result.output shouldContain "No projects have changed - nothing to build"
+        result.extractExecutedBuildTasks().shouldBeEmpty()
+    }
+
+    // ─────────────────────────────────────────────────────────────
     // Git command failure propagation
     // ─────────────────────────────────────────────────────────────
 

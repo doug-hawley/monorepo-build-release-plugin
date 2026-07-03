@@ -63,6 +63,51 @@ class MonorepoPluginConfigurationTest : FunSpec({
         changedProjects shouldContain ":core"
     }
 
+    test("custom rootTriggerPatterns treat matching root files as affecting all projects") {
+        // given: rootTriggerPatterns replaced so only ci/** files affect all projects
+        val projectDir = testProjectListener.getTestProjectDir()
+        val project = TestProjectBuilder(projectDir)
+            .withSubproject("api")
+            .withSubproject("core")
+            .applyPlugin()
+            .withRemote()
+            .build()
+        project.modifyFile(
+            "build.gradle.kts",
+            """
+            plugins {
+                id("io.github.doug-hawley.monorepo-build-release-plugin")
+            }
+
+            monorepo {
+                build {
+                    includeUntracked = true
+                    rootTriggerPatterns = listOf("ci/.*")
+                }
+            }
+
+            allprojects {
+                repositories {
+                    mavenCentral()
+                }
+            }
+            """.trimIndent()
+        )
+        project.initGit()
+        project.commitAll("Initial commit")
+        project.pushToRemote()
+
+        // when: a file matching the custom pattern is created (untracked)
+        project.createNewFile("ci/pipeline.yml", "steps: []")
+        val result = project.runTask("printChanged")
+
+        // then: all projects are affected even though no project file changed
+        result.task(":printChanged")?.outcome shouldBe TaskOutcome.SUCCESS
+        val affectedProjects = result.extractBuiltProjects()
+        affectedProjects shouldContain ":api"
+        affectedProjects shouldContain ":core"
+    }
+
     test("plugin fails with helpful error when configuration cache is requested") {
         // given: a standard project with the plugin applied
         val project = testProjectListener.createStandardProject()
