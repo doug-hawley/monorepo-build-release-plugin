@@ -31,7 +31,7 @@ class ProjectMetadataFactory(private val logger: Logger) {
 
         // Build metadata recursively for each project
         projectMap.forEach { (_, project) ->
-            buildMetadataRecursively(project, projectMap, metadataMap, changedFilesMap)
+            buildMetadataRecursively(project, projectMap, metadataMap, changedFilesMap, mutableSetOf())
         }
 
         return metadataMap
@@ -39,25 +39,44 @@ class ProjectMetadataFactory(private val logger: Logger) {
 
     /**
      * Recursively builds ProjectMetadata for a project and its dependencies.
+     *
+     * The [inProgress] set holds the recursion stack so that self-references
+     * (e.g. the one java-test-fixtures adds via testImplementation(testFixtures(project)))
+     * and cross-configuration dependency cycles cannot recurse forever (issue #204).
      */
     private fun buildMetadataRecursively(
         project: Project,
         projectMap: Map<String, Project>,
         metadataMap: MutableMap<String, ProjectMetadata>,
-        changedFilesMap: Map<String, List<String>>
+        changedFilesMap: Map<String, List<String>>,
+        inProgress: MutableSet<String>
     ): ProjectMetadata {
         // Return cached metadata if already built
         metadataMap[project.path]?.let {
             return it
         }
 
+        inProgress.add(project.path)
+
         // Find dependency paths
         val dependencyPaths = findProjectDependencies(project)
 
         // Recursively build metadata for each dependency (nested objects)
         val dependencyMetadataList = dependencyPaths.mapNotNull { depPath ->
-            projectMap[depPath]?.let { depProject ->
-                buildMetadataRecursively(depProject, projectMap, metadataMap, changedFilesMap)
+            if (depPath == project.path) {
+                logger.debug("Skipping self-referencing dependency of ${project.path}")
+                null
+            } else if (depPath in inProgress) {
+                logger.warn(
+                    "Dependency cycle detected between ${project.path} and $depPath; " +
+                        "ignoring the ${project.path} -> $depPath edge for change detection. " +
+                        "Projects in a dependency cycle may not be detected as affected by each other's changes."
+                )
+                null
+            } else {
+                projectMap[depPath]?.let { depProject ->
+                    buildMetadataRecursively(depProject, projectMap, metadataMap, changedFilesMap, inProgress)
+                }
             }
         }
 
@@ -74,6 +93,7 @@ class ProjectMetadataFactory(private val logger: Logger) {
 
         // Cache the metadata
         metadataMap[project.path] = metadata
+        inProgress.remove(project.path)
 
         return metadata
     }
