@@ -9,6 +9,8 @@ import org.gradle.api.logging.Logger
  */
 class ProjectMetadataFactory(private val logger: Logger) {
 
+    private val dependencyPathResolver = ProjectDependencyPathResolver(logger)
+
     /**
      * Builds a map of ProjectMetadata objects for all projects in the hierarchy.
      * Each ProjectMetadata includes its dependencies as a list of other ProjectMetadata objects.
@@ -120,8 +122,7 @@ class ProjectMetadataFactory(private val logger: Logger) {
                         // object with endorseStrictVersions() and the Category.REGULAR_PLATFORM
                         // attribute set on it — it does not wrap it in a different type.
                         if (dep is ProjectDependency) {
-                            @Suppress("DEPRECATION")
-                            dependencies.add(dep.dependencyProject.path)
+                            dependencyPathResolver.resolve(dep)?.let { dependencies.add(it) }
                         }
                     }
                 } catch (e: Exception) {

@@ -308,4 +308,43 @@ class PrintChangedFunctionalTest : FunSpec({
         result.output shouldContain "Change detection baseline: origin/main ("
         result.output shouldContain "Changed projects (since origin/main @"
     }
+
+    // --- Cross-Gradle-version project dependency resolution ---
+    // ProjectDependency.getDependencyProject() was removed in Gradle 9.0; its replacement,
+    // getPath(), only exists from Gradle 8.11 onward. Neither method exists across the whole
+    // 8.0-9.x range the plugin supports, so transitive dependency detection is pinned against
+    // real Gradle distributions on both sides of that boundary here, rather than relying on
+    // whichever Gradle version happens to build the plugin itself.
+
+    test("plugin detects transitive dependents on Gradle 8.5 (pre-getPath)") {
+        // given
+        val project = testProjectListener.createStandardProject()
+
+        // when
+        project.appendToFile(Files.MODULE1_SOURCE, "\n// Modified module1")
+        project.commitAll("Change module1")
+        val result = project.runTask("printChanged", gradleVersion = "8.5")
+
+        // then
+        result.task(":printChanged")?.outcome shouldBe TaskOutcome.SUCCESS
+        val changedProjects = result.extractChangedProjects()
+        changedProjects shouldHaveSize 2
+        changedProjects shouldContainAll setOf(Projects.MODULE1, Projects.APP1)
+    }
+
+    test("plugin detects transitive dependents on Gradle 9.7.1 (post-getDependencyProject)") {
+        // given
+        val project = testProjectListener.createStandardProject()
+
+        // when
+        project.appendToFile(Files.MODULE1_SOURCE, "\n// Modified module1")
+        project.commitAll("Change module1")
+        val result = project.runTask("printChanged", gradleVersion = "9.7.1")
+
+        // then
+        result.task(":printChanged")?.outcome shouldBe TaskOutcome.SUCCESS
+        val changedProjects = result.extractChangedProjects()
+        changedProjects shouldHaveSize 2
+        changedProjects shouldContainAll setOf(Projects.MODULE1, Projects.APP1)
+    }
 })
