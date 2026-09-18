@@ -18,7 +18,9 @@ class TestProjectBuilder(private val projectDir: File) {
         val dependencies: List<String> = emptyList(),
         val isBom: Boolean = false,
         val usePlatform: Boolean = false,
-        val excludePatterns: List<String> = emptyList()
+        val excludePatterns: List<String> = emptyList(),
+        val extraPlugins: List<String> = emptyList(),
+        val testDependsOn: List<String> = emptyList()
     )
 
     fun withSubproject(
@@ -26,9 +28,11 @@ class TestProjectBuilder(private val projectDir: File) {
         dependsOn: List<String> = emptyList(),
         isBom: Boolean = false,
         usePlatform: Boolean = false,
-        excludePatterns: List<String> = emptyList()
+        excludePatterns: List<String> = emptyList(),
+        extraPlugins: List<String> = emptyList(),
+        testDependsOn: List<String> = emptyList()
     ): TestProjectBuilder {
-        subprojects.add(SubprojectConfig(name, dependsOn, isBom, usePlatform, excludePatterns))
+        subprojects.add(SubprojectConfig(name, dependsOn, isBom, usePlatform, excludePatterns, extraPlugins, testDependsOn))
         return this
     }
 
@@ -103,9 +107,12 @@ class TestProjectBuilder(private val projectDir: File) {
                 } else {
                     appendLine("    java")
                 }
+                subproject.extraPlugins.forEach { pluginId ->
+                    appendLine("    id(\"$pluginId\")")
+                }
                 appendLine("}")
                 appendLine()
-                if (subproject.dependencies.isNotEmpty()) {
+                if (subproject.dependencies.isNotEmpty() || subproject.testDependsOn.isNotEmpty()) {
                     appendLine("dependencies {")
 
                     // Separate platform dependencies from regular dependencies
@@ -126,6 +133,11 @@ class TestProjectBuilder(private val projectDir: File) {
                             val gradlePath = dep.replace("/", ":")
                             appendLine("    implementation(project(\":$gradlePath\"))")
                         }
+                    }
+
+                    subproject.testDependsOn.forEach { dep ->
+                        val gradlePath = dep.replace("/", ":")
+                        appendLine("    testImplementation(project(\":$gradlePath\"))")
                     }
 
                     appendLine("}")
