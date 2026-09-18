@@ -500,6 +500,119 @@ class ProjectMetadataFactoryTest : FunSpec({
         serviceMetadata.dependencies[0].fullyQualifiedName shouldBe ":platform"
     }
 
+    test("should not recurse infinitely on self-referencing dependency") {
+        // given: a project that declares a dependency on itself, as java-test-fixtures does
+        // via testImplementation(testFixtures(project)) (issue #204)
+        val rootProject = ProjectBuilder.builder().build()
+        val lib = ProjectBuilder.builder()
+            .withParent(rootProject)
+            .withName("lib")
+            .build()
+
+        lib.pluginManager.apply("java-library")
+        lib.dependencies.add("testImplementation", lib)
+
+        val logger = rootProject.logger
+        val factory = ProjectMetadataFactory(logger)
+
+        // when
+        val metadataMap = factory.buildProjectMetadataMap(rootProject)
+
+        // then: the self-reference is dropped instead of overflowing the stack
+        val libMetadata = metadataMap[":lib"]
+        libMetadata shouldNotBe null
+        libMetadata!!.dependencies shouldHaveSize 0
+    }
+
+    test("should not recurse infinitely when java-test-fixtures plugin is applied") {
+        // given: java-test-fixtures automatically adds a ProjectDependency on the project itself
+        val rootProject = ProjectBuilder.builder().build()
+        val lib = ProjectBuilder.builder()
+            .withParent(rootProject)
+            .withName("lib")
+            .build()
+        val app = ProjectBuilder.builder()
+            .withParent(rootProject)
+            .withName("app")
+            .build()
+
+        lib.pluginManager.apply("java-library")
+        lib.pluginManager.apply("java-test-fixtures")
+        app.pluginManager.apply("java-library")
+        app.dependencies.add("implementation", lib)
+
+        val logger = rootProject.logger
+        val factory = ProjectMetadataFactory(logger)
+
+        // when
+        val metadataMap = factory.buildProjectMetadataMap(rootProject)
+
+        // then: real dependencies are preserved, the self-reference is dropped
+        val libMetadata = metadataMap[":lib"]
+        libMetadata shouldNotBe null
+        libMetadata!!.dependencies shouldHaveSize 0
+
+        val appMetadata = metadataMap[":app"]
+        appMetadata shouldNotBe null
+        appMetadata!!.dependencies shouldHaveSize 1
+        appMetadata.dependencies[0].fullyQualifiedName shouldBe ":lib"
+    }
+
+    // :lib-a testImplementation-depends on :lib-b while :lib-b implementation-depends on :lib-a —
+    // legal in Gradle (different configurations), but a genuine cycle from
+    // ProjectMetadataFactory's point of view. Breaking the cycle necessarily drops one of the two
+    // edges, so which project's *direct* changes still reach the other depends on which edge
+    // survives — not on which project changed. Both directions are asserted below because an
+    // earlier version of this fix (which dropped the cyclic edge instead of stubbing it) passed
+    // whichever direction happened to align with visitation order while silently failing the
+    // other: a project's own direct changes stopped propagating to anything depending on it
+    // solely through the dropped edge.
+    test("should detect a change in lib-a propagating to lib-b across a cross-configuration cycle") {
+        // given
+        val rootProject = ProjectBuilder.builder().build()
+        val libA = ProjectBuilder.builder().withParent(rootProject).withName("lib-a").build()
+        val libB = ProjectBuilder.builder().withParent(rootProject).withName("lib-b").build()
+
+        libA.pluginManager.apply("java-library")
+        libB.pluginManager.apply("java-library")
+        libA.dependencies.add("testImplementation", libB)
+        libB.dependencies.add("implementation", libA)
+
+        val logger = rootProject.logger
+        val factory = ProjectMetadataFactory(logger)
+        val changedFilesMap = mapOf(":lib-a" to listOf("lib-a/File.kt"))
+
+        // when
+        val metadataMap = factory.buildProjectMetadataMap(rootProject, changedFilesMap)
+
+        // then: no StackOverflowError, and lib-b sees lib-a's direct change despite the cycle
+        metadataMap[":lib-b"] shouldNotBe null
+        metadataMap[":lib-b"]!!.hasChanges() shouldBe true
+    }
+
+    test("should detect a change in lib-b propagating to lib-a across a cross-configuration cycle") {
+        // given
+        val rootProject = ProjectBuilder.builder().build()
+        val libA = ProjectBuilder.builder().withParent(rootProject).withName("lib-a").build()
+        val libB = ProjectBuilder.builder().withParent(rootProject).withName("lib-b").build()
+
+        libA.pluginManager.apply("java-library")
+        libB.pluginManager.apply("java-library")
+        libA.dependencies.add("testImplementation", libB)
+        libB.dependencies.add("implementation", libA)
+
+        val logger = rootProject.logger
+        val factory = ProjectMetadataFactory(logger)
+        val changedFilesMap = mapOf(":lib-b" to listOf("lib-b/File.kt"))
+
+        // when
+        val metadataMap = factory.buildProjectMetadataMap(rootProject, changedFilesMap)
+
+        // then: no StackOverflowError, and lib-a sees lib-b's direct change despite the cycle
+        metadataMap[":lib-a"] shouldNotBe null
+        metadataMap[":lib-a"]!!.hasChanges() shouldBe true
+    }
+
     test("should handle projects with no changes in changed files map") {
         // given
         val rootProject = ProjectBuilder.builder().build()

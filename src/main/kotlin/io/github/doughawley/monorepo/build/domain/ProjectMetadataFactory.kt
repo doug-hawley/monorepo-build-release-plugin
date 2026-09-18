@@ -33,7 +33,7 @@ class ProjectMetadataFactory(private val logger: Logger) {
 
         // Build metadata recursively for each project
         projectMap.forEach { (_, project) ->
-            buildMetadataRecursively(project, projectMap, metadataMap, changedFilesMap)
+            buildMetadataRecursively(project, projectMap, metadataMap, changedFilesMap, mutableSetOf())
         }
 
         return metadataMap
@@ -41,25 +41,67 @@ class ProjectMetadataFactory(private val logger: Logger) {
 
     /**
      * Recursively builds ProjectMetadata for a project and its dependencies.
+     *
+     * [inProgress] is the current recursion stack (issue #204). Without it, a project that
+     * depends on itself — which java-test-fixtures adds automatically via
+     * testImplementation(testFixtures(project)) — or a legal cross-configuration cycle between
+     * two projects (":a" testImplementation-depends on ":b" while ":b" implementation-depends on
+     * ":a") recurses forever, since metadata is only cached *after* fully recursing into a
+     * project's dependencies. Revisiting a project already on the stack means we've found a
+     * cycle; that one edge is cut to break the recursion.
+     *
+     * The cut edge still contributes a ProjectMetadata node with the target's own changedFiles
+     * (so a direct change to the cycle target is still detected) but no dependencies of its own
+     * (its transitive dependencies were already being resolved further up the same call stack,
+     * so they're unavailable here without re-deriving them). This node is deliberately built
+     * fresh rather than pulled from [metadataMap] and is not cached into it either: the cycle's
+     * other member reaches its *real*, fully-connected metadata once its own top-level build
+     * completes — only this one back edge sees the incomplete view. An earlier version of this
+     * fix dropped the cyclic edge entirely instead of stubbing it; that undercounted changes,
+     * since a project's own direct edits stopped propagating to anything that depended on it
+     * solely through the dropped edge.
      */
     private fun buildMetadataRecursively(
         project: Project,
         projectMap: Map<String, Project>,
         metadataMap: MutableMap<String, ProjectMetadata>,
-        changedFilesMap: Map<String, List<String>>
+        changedFilesMap: Map<String, List<String>>,
+        inProgress: MutableSet<String>
     ): ProjectMetadata {
         // Return cached metadata if already built
         metadataMap[project.path]?.let {
             return it
         }
 
+        inProgress.add(project.path)
+
         // Find dependency paths
         val dependencyPaths = findProjectDependencies(project)
 
         // Recursively build metadata for each dependency (nested objects)
         val dependencyMetadataList = dependencyPaths.mapNotNull { depPath ->
-            projectMap[depPath]?.let { depProject ->
-                buildMetadataRecursively(depProject, projectMap, metadataMap, changedFilesMap)
+            if (depPath == project.path) {
+                // A pure self-dependency carries no change-detection information beyond what
+                // this project's own changedFiles already provides, and is routine enough
+                // (java-test-fixtures adds one to every fixtures-enabled project) not to warn on.
+                logger.debug("Skipping self-referencing dependency of ${project.path}")
+                null
+            } else if (depPath in inProgress) {
+                logger.warn(
+                    "Dependency cycle detected between ${project.path} and $depPath; " +
+                        "ignoring the ${project.path} -> $depPath edge for change detection. " +
+                        "Projects in a dependency cycle may not be detected as affected by each other's changes."
+                )
+                ProjectMetadata(
+                    name = projectMap[depPath]?.name ?: depPath.substringAfterLast(':'),
+                    fullyQualifiedName = depPath,
+                    dependencies = emptyList(),
+                    changedFiles = changedFilesMap[depPath] ?: emptyList()
+                )
+            } else {
+                projectMap[depPath]?.let { depProject ->
+                    buildMetadataRecursively(depProject, projectMap, metadataMap, changedFilesMap, inProgress)
+                }
             }
         }
 
@@ -76,6 +118,7 @@ class ProjectMetadataFactory(private val logger: Logger) {
 
         // Cache the metadata
         metadataMap[project.path] = metadata
+        inProgress.remove(project.path)
 
         return metadata
     }
