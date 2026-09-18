@@ -237,8 +237,8 @@ class TestProject(
         file.writeText(content)
     }
 
-    fun runTask(vararg tasks: String): BuildResult {
-        return gradleRunner()
+    fun runTask(vararg tasks: String, gradleVersion: String? = null): BuildResult {
+        return gradleRunner(gradleVersion)
             .withArguments(tasks.toList() + listOf("--parallel", "--stacktrace"))
             .build()
     }
@@ -275,15 +275,19 @@ class TestProject(
         return process.inputStream.bufferedReader().readText().trim()
     }
 
-    private fun gradleRunner(): GradleRunner {
+    private fun gradleRunner(gradleVersion: String? = null): GradleRunner {
         val env = HashMap(System.getenv())
         // Strip env vars that trigger Develocity auto-injection via gradle/actions/setup-gradle.
         // The injected init script interferes with projectsEvaluated task registration in CI.
         env.keys.removeIf { it.startsWith("DEVELOCITY_") || it.startsWith("GRADLE_BUILD_ACTION_") }
-        return GradleRunner.create()
+        val runner = GradleRunner.create()
             .withProjectDir(projectDir)
             .withEnvironment(env)
             .withPluginClasspath()
+        if (gradleVersion != null) {
+            runner.withGradleVersion(gradleVersion)
+        }
+        return runner
     }
 
     private fun executeCommand(vararg command: String) {
