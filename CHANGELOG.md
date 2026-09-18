@@ -4,6 +4,14 @@ All notable changes to this project will be documented in this file.
 
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.4.7](https://github.com/doug-hawley/monorepo-build-release-plugin/compare/v0.4.6...v0.4.7) (2026-09-18)
+
+
+### Bug Fixes
+
+* guard against dependency cycles in ProjectMetadataFactory recursion ([356d91f](https://github.com/doug-hawley/monorepo-build-release-plugin/commit/356d91f01f74a3a16ab0cfce3f8af73f1889ba0f)), closes [#204](https://github.com/doug-hawley/monorepo-build-release-plugin/issues/204)
+* support Gradle 8.0-9.x for project dependency resolution ([9351cb5](https://github.com/doug-hawley/monorepo-build-release-plugin/commit/9351cb5388353f4ed6b1ac90053085541529cb12))
+
 ## [0.4.6](https://github.com/doug-hawley/monorepo-build-release-plugin/compare/v0.4.5...v0.4.6) (2026-04-03)
 
 
