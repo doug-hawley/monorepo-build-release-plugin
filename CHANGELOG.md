@@ -4,6 +4,13 @@ All notable changes to this project will be documented in this file.
 
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.4.8](https://github.com/doug-hawley/monorepo-build-release-plugin/compare/v0.4.7...v0.4.8) (2026-11-11)
+
+
+### Features
+
+* add debug diagnostics for buildChanged hang investigation ([#221](https://github.com/doug-hawley/monorepo-build-release-plugin/issues/221)) ([fee0234](https://github.com/doug-hawley/monorepo-build-release-plugin/commit/fee0234797ba8d3807f1d22ca17cab24cb528ab8))
+
 ## [0.4.7](https://github.com/doug-hawley/monorepo-build-release-plugin/compare/v0.4.6...v0.4.7) (2026-09-18)
 
 
