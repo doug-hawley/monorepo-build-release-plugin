@@ -10,6 +10,7 @@ import io.kotest.matchers.collections.shouldContainExactlyInAnyOrder
 import io.kotest.matchers.collections.shouldHaveSize
 import io.kotest.matchers.collections.shouldNotContain
 import io.kotest.matchers.shouldBe
+import io.kotest.matchers.shouldNotBe
 import io.kotest.matchers.string.shouldContain
 import org.gradle.testkit.runner.TaskOutcome
 
@@ -66,6 +67,28 @@ class BuildChangedFunctionalTest : FunSpec({
         result.task(":buildChanged")?.outcome shouldBe TaskOutcome.SUCCESS
         result.output shouldContain "No projects have changed - nothing to build"
         result.extractExecutedBuildTasks().shouldBeEmpty()
+        result.output shouldContain "Task graph ready:"
+    }
+
+    test("buildChanged logs the task graph ready marker after task selection") {
+        // given
+        val project = testProjectListener.createStandardProject()
+        project.appendToFile(Files.COMMON_LIB_SOURCE, "\n// Modified")
+        project.commitAll("Change common-lib")
+
+        // when
+        val result = project.runTask("buildChanged")
+
+        // then: the marker appears, and after the "Affected projects" summary this
+        // plugin logs in the configuration phase — confirming the hand-off point
+        // between this plugin's own work and Gradle's task-graph assembly/execution
+        result.task(":buildChanged")?.outcome shouldBe TaskOutcome.SUCCESS
+        result.output shouldContain "Task graph ready:"
+        val affectedIndex = result.output.indexOf("Affected projects:")
+        val taskGraphIndex = result.output.indexOf("Task graph ready:")
+        affectedIndex shouldNotBe -1
+        taskGraphIndex shouldNotBe -1
+        (taskGraphIndex > affectedIndex) shouldBe true
     }
 
     test("buildChanged handles multiple independent app changes") {

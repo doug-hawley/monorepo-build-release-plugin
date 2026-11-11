@@ -18,9 +18,12 @@ import io.github.doughawley.monorepo.release.task.ReleaseTask
 import io.github.doughawley.monorepo.git.GitCommandExecutor
 import io.github.doughawley.monorepo.release.git.GitReleaseExecutor
 import io.github.doughawley.monorepo.release.git.GitTagScanner
+import org.gradle.api.Action
 import org.gradle.api.GradleException
 import org.gradle.api.Plugin
 import org.gradle.api.Project
+import org.gradle.api.Task
+import org.gradle.api.execution.TaskExecutionGraph
 import org.gradle.api.logging.Logger
 
 /**
@@ -126,6 +129,18 @@ class MonorepoBuildReleasePlugin : Plugin<Project> {
                 }
             }
         }
+
+        // Marks the hand-off from this plugin's configuration-phase work (above) to
+        // Gradle's own task-graph assembly and execution. This plugin has no code running
+        // between "Selected primary task" and the first task starting — if a build appears
+        // to stall there, this line's absence shows the stall is inside Gradle itself
+        // (realizing lazily-registered tasks reachable via dependsOn/finalizedBy, or
+        // resolving their dependencies), not in this plugin.
+        project.gradle.taskGraph.whenReady(Action<TaskExecutionGraph> {
+            if (isChangeDetectionRun(project)) {
+                project.logger.lifecycle("Task graph ready: ${allTasks.size} task(s) scheduled for execution")
+            }
+        })
 
         // ── Build tasks ──────────────────────────────────────────────────────────
 
@@ -354,7 +369,7 @@ class MonorepoBuildReleasePlugin : Plugin<Project> {
         affectedProjects.forEach { projectPath ->
             val targetProject = project.rootProject.findProject(projectPath)
             if (targetProject != null) {
-                val buildTask = targetProject.tasks.findByName("build")
+                val buildTask = findBuildTaskTimed(project.logger, targetProject, projectPath)
                 if (buildTask != null) {
                     buildChangedTask.configure {
                         dependsOn(buildTask)
@@ -380,7 +395,7 @@ class MonorepoBuildReleasePlugin : Plugin<Project> {
             val buildChangedTask = sub.tasks.findByName("buildChanged") ?: return@forEach
 
             // Wire the project's own build task only when it has changes
-            val ownBuildTask = sub.tasks.findByName("build")
+            val ownBuildTask = findBuildTaskTimed(project.logger, sub, sub.path)
             if (ownBuildTask != null && affectedProjects.contains(sub.path)) {
                 buildChangedTask.dependsOn(ownBuildTask)
             }
@@ -392,13 +407,40 @@ class MonorepoBuildReleasePlugin : Plugin<Project> {
             changedUpstreamDeps.forEach { depPath ->
                 val depProject = project.rootProject.findProject(depPath)
                 if (depProject != null) {
-                    val buildTask = depProject.tasks.findByName("build")
+                    val buildTask = findBuildTaskTimed(project.logger, depProject, depPath)
                     if (buildTask != null) {
                         buildChangedTask.dependsOn(buildTask)
                     }
                 }
             }
         }
+    }
+
+    /**
+     * Runs [block], logging its elapsed time at debug level so a slow or stalled
+     * configuration-phase step in a large monorepo is attributable to a specific phase
+     * instead of only showing up as silence.
+     */
+    private fun <T> timed(logger: Logger, label: String, block: () -> T): T {
+        logger.debug("$label: starting")
+        val start = System.currentTimeMillis()
+        val result = block()
+        logger.debug("$label: completed in ${System.currentTimeMillis() - start}ms")
+        return result
+    }
+
+    /**
+     * Realizes a project's lazily-registered "build" task, logging before and after so a
+     * hang inside that task's own registration block (e.g. heavy logic in the consuming
+     * project's build script) is pinpointed to the exact project, rather than only showing
+     * up as silence after the fact.
+     */
+    private fun findBuildTaskTimed(logger: Logger, target: Project, projectPath: String): Task? {
+        logger.debug("Realizing 'build' task for $projectPath")
+        val start = System.currentTimeMillis()
+        val buildTask = target.tasks.findByName("build")
+        logger.debug("Realized 'build' task for $projectPath in ${System.currentTimeMillis() - start}ms")
+        return buildTask
     }
 
     /**
@@ -417,23 +459,29 @@ class MonorepoBuildReleasePlugin : Plugin<Project> {
         val projectMapper = ProjectFileMapper()
         val metadataFactory = ProjectMetadataFactory(logger)
 
-        val changedFiles = gitDetector.getChangedFiles(resolvedBaseRef, extension.includeUntracked, extension.excludePatterns)
-        val changedFilesMap = projectMapper.mapChangedFilesToProjects(project.rootProject, changedFiles)
-        val filteredChangedFilesMap = applyPerProjectExcludes(project.rootProject, changedFilesMap, logger)
-        val metadataMap = metadataFactory.buildProjectMetadataMap(project.rootProject, filteredChangedFilesMap)
+        val changedFiles = timed(logger, "Git change detection") {
+            gitDetector.getChangedFiles(resolvedBaseRef, extension.includeUntracked, extension.excludePatterns)
+        }
 
-        val monorepoProjects = MonorepoProjects(metadataMap.values.toList())
+        val monorepoProjects = timed(logger, "File-to-project mapping and dependency graph build") {
+            val changedFilesMap = projectMapper.mapChangedFilesToProjects(project.rootProject, changedFiles)
+            val filteredChangedFilesMap = applyPerProjectExcludes(project.rootProject, changedFilesMap, logger)
+            val metadataMap = metadataFactory.buildProjectMetadataMap(project.rootProject, filteredChangedFilesMap)
+            MonorepoProjects(metadataMap.values.toList())
+        }
         extension.monorepoProjects = monorepoProjects
 
-        val allAffectedProjects = monorepoProjects.getChangedProjectPaths()
-            .filter { path ->
-                path != ":" && hasBuildFile(project.rootProject, path).also { hasBuild ->
-                    if (!hasBuild) {
-                        logger.debug("Excluding $path from affected projects: no build file found")
+        val allAffectedProjects = timed(logger, "Affected-set filtering") {
+            monorepoProjects.getChangedProjectPaths()
+                .filter { path ->
+                    path != ":" && hasBuildFile(project.rootProject, path).also { hasBuild ->
+                        if (!hasBuild) {
+                            logger.debug("Excluding $path from affected projects: no build file found")
+                        }
                     }
                 }
-            }
-            .toSet()
+                .toSet()
+        }
         extension.allAffectedProjects = allAffectedProjects
 
         logger.info("Changed files count: ${changedFiles.size}")
